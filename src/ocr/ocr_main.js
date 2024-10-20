@@ -306,6 +306,7 @@ const API = {
 };
 
 function connect() {
+	return;
 	if (connection) {
 		connection.close();
 	}
@@ -498,7 +499,9 @@ start_timer.addEventListener('click', evt => {
 	// minutes are valid per markup restrictions
 	const minutes = parseInt(document.querySelector('#minutes').value, 10);
 
-	connection.send(['startTimer', minutes * 60]);
+	if (connection) {
+		connection.send(['startTimer', minutes * 60]);
+	}
 });
 
 video.controls = false;
@@ -783,7 +786,9 @@ function onVdoNinjaChange() {
 
 		iframe.src = url.toString();
 
-		connection.send(['setVdoNinjaURL', viewURL]);
+		if (connection) {
+			connection.send(['setVdoNinjaURL', viewURL]);
+		}
 		navigator.clipboard.writeText(viewURL);
 		document.querySelector(
 			'#vdo_ninja_url'
@@ -794,7 +799,9 @@ function onVdoNinjaChange() {
 		onPrivacyChanged();
 	} else {
 		iframe.src = '';
-		connection.send(['setVdoNinjaURL', '']);
+		if (connection) {
+			connection.send(['setVdoNinjaURL', '']);
+		}
 		document.querySelector('#vdo_ninja_url').textContent = '';
 	}
 }
@@ -814,11 +821,15 @@ function onFocusAlarmChanged() {
 focus_alarm.addEventListener('change', onFocusAlarmChanged);
 
 set_ready.addEventListener('click', () => {
-	connection?.send(['setReady', true]);
+	if (connection) {
+		connection?.send(['setReady', true]);
+	}
 });
 
 not_ready.addEventListener('click', () => {
-	connection?.send(['setReady', false]);
+	if (connection) {
+		connection?.send(['setReady', false]);
+	}
 });
 
 // ====================
@@ -1112,7 +1123,9 @@ async function initCaptureFromEverdrive() {
 		} while (false);
 
 		last_frame = data;
-		connection.send(BinaryFrame.encode(data));
+		if (connection) {
+			connection.send(BinaryFrame.encode(data));
+		}
 	};
 }
 
@@ -1944,11 +1957,15 @@ function trackAndSendFrames() {
 		last_frame = data;
 
 		if (send_binary) {
-			connection.send(BinaryFrame.encode(data));
+			if (connection) {
+				connection.send(BinaryFrame.encode(data));
+			}
 		} else {
 			// convert Uint8Array to normal array so it can be json-encoded properly
 			data.field = [...data.field];
-			connection.send(data);
+			if (connection) {
+				connection.send(data);
+			}
 		}
 	};
 
