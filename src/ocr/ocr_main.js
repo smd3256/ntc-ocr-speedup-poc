@@ -1932,9 +1932,9 @@ function trackAndSendFrames() {
 			);
 
 			showPerfData({
-				show_perf_data: performance
-					.getEntriesByName('show_perf_data')[0]
-					.duration.toFixed(3),
+				show_perf_data: (
+					performance.getEntriesByName('show_perf_data')[0].duration / perfCount
+				).toFixed(3),
 			});
 
 			perfSumData = {};
