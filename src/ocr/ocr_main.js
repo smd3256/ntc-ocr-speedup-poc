@@ -1791,31 +1791,34 @@ function loadConfig() {
 function showFrameData(data) {
 	if (!data) return;
 
-	// TODO: fix markup on config change, rather than destroy-rebuild at every frame
-	frame_data.innerHTML = '';
+	// FIXME: remove extra dt/dds if entries change frequently (is it possible?)
 
 	for (const [name, value] of Object.entries(data)) {
 		if (name === 'raw') continue;
+		let dt = frame_data.querySelector(`dt.${name}`);
 
-		const dt = document.createElement('dt');
-		const dd = document.createElement('dd');
+		const textContent =
+			name === 'field' ? data.field.slice(0, 30).join('') : value;
 
-		dt.textContent = name;
-		if (name === 'field') {
-			if (config.device_id != 'everdrive') {
-				dd.textContent = data.field.slice(0, 30).join('');
+		if (dt) {
+			const dd = dt.nextSibling;
+			if (value === null) {
+				dd.remove();
+				dt.remove();
 			} else {
-				const rows = Array(20)
-					.fill()
-					.map((_, idx) => data.field.slice(idx * 10, (idx + 1) * 10).join(''));
-				dd.innerHTML = `${rows.join('<br/>')}`;
+				dd.textContent = textContent;
 			}
-		} else {
-			dd.textContent = value;
-		}
+		} else if (value !== null) {
+			const dt = document.createElement('dt');
+			const dd = document.createElement('dd');
 
-		frame_data.appendChild(dt);
-		frame_data.appendChild(dd);
+			dt.classList.add(name);
+			dt.textContent = name;
+			dd.textContent = textContent;
+
+			frame_data.appendChild(dt);
+			frame_data.appendChild(dd);
+		}
 	}
 }
 
@@ -1845,6 +1848,10 @@ function showPerfData(perf) {
 		}
 	}
 }
+
+let lastPerfDisplay = 0;
+let perfSumData = {};
+let perfCount = 0;
 
 function trackAndSendFrames() {
 	if (show_parts.checked) {
@@ -1880,8 +1887,6 @@ function trackAndSendFrames() {
 			} catch (err) {}
 		}
 
-		const perf = {};
-
 		try {
 			performance.measure('capture', 'capture_start', 'capture_end');
 		} catch (err) {}
@@ -1902,27 +1907,40 @@ function trackAndSendFrames() {
 		} catch (err) {}
 
 		performance.getEntriesByType('measure').forEach(m => {
-			perf[m.name] = m.duration.toFixed(3);
+			perfSumData[m.name] = (perfSumData[m.name] || 0) + m.duration;
 		});
+		perfCount++;
 
-		if (!show_parts.checked) {
-			perf.show_parts = null;
+		if (!lastPerfDisplay || Date.now() - lastPerfDisplay >= 1000) {
+			const perf = {};
+
+			for (const [name, duration] of Object.entries(perfSumData)) {
+				perf[name] = (duration / perfCount).toFixed(3);
+			}
+
+			if (!show_parts.checked) {
+				perf.show_parts = null;
+			}
+
+			performance.mark('show_perf_data_start');
+			showPerfData(perf);
+			performance.mark('show_perf_data_end');
+			performance.measure(
+				'show_perf_data',
+				'show_perf_data_start',
+				'show_perf_data_end'
+			);
+
+			showPerfData({
+				show_perf_data: performance
+					.getEntriesByName('show_perf_data')[0]
+					.duration.toFixed(3),
+			});
+
+			perfSumData = {};
+			perfCount = 0;
+			lastPerfDisplay = Date.now();
 		}
-
-		performance.mark('show_perf_data_start');
-		showPerfData(perf);
-		performance.mark('show_perf_data_end');
-		performance.measure(
-			'show_perf_data',
-			'show_perf_data_start',
-			'show_perf_data_end'
-		);
-
-		showPerfData({
-			show_perf_data: performance
-				.getEntriesByName('show_perf_data')[0]
-				.duration.toFixed(3),
-		});
 
 		performance.clearMarks();
 		performance.clearMeasures();
