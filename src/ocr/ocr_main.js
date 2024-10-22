@@ -125,6 +125,8 @@ const tabsContainer = document.querySelector('#tabs'),
 	video = document.querySelector('#device_video'),
 	frame_data = document.querySelector('#frame_data'),
 	perf_data = document.querySelector('#perf_data'),
+	status_device_name = document.querySelector('#status_device_name'),
+	status_resolution_fps = document.querySelector('#status_resolution_fps'),
 	capture = document.querySelector('#capture'),
 	adjustments = document.querySelector('#adjustments'),
 	image_corrections = document.querySelector('#image_corrections'),
@@ -146,6 +148,8 @@ let config;
 let connection;
 let pending_calibration = false;
 let in_calibration = false;
+
+let device_label_by_id = {};
 
 device_selector.addEventListener('change', evt => {
 	config.device_id = device_selector.value;
@@ -962,6 +966,7 @@ function updateDeviceList(devices) {
 
 		return device;
 	});
+	device_label_by_id = Object.fromEntries(devices.map(camera => [camera.deviceId, camera.label]));
 
 	const default_devices = [
 		{
@@ -1148,6 +1153,8 @@ async function playVideoFromDevice(device_id, fps) {
 		// we only prompt for permission with the first call
 		if (device_id === undefined) return;
 
+		status_device_name.textContent = device_label_by_id[device_id];
+
 		// when an actual device id is supplied, we start everything
 		video.srcObject = stream;
 		video.ntcType = 'device';
@@ -1169,6 +1176,8 @@ async function playVideoFromScreenCap(fps) {
 		};
 
 		const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+
+		status_device_name.textContent = 'Screen capture';
 
 		// when an actual device id is supplied, we start everything
 		video.srcObject = stream;
@@ -1241,6 +1250,8 @@ async function startCapture(stream) {
 			settings.height
 		}@${settings.frameRate.toFixed(1)}fps`
 	);
+
+	status_resolution_fps.textContent = `${settings.width}x${settings.height} ${settings.frameRate.toFixed(1)}fps`;
 
 	if (show_parts.checked) {
 		adjustments.style.display = 'block';

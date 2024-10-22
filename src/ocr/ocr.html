@@ -116,7 +116,8 @@
 			}
 
 			#frame_data,
-			#perf_data {
+			#perf_data,
+			#ocr_status {
 				font-family: monospace;
 				margin: 1em 0;
 			}
@@ -163,7 +164,7 @@
 				font-size: 1em;
 			}
 
-			#ocr_results {
+			#ocr_results_row2 {
 				display: flex;
 				flex-direction: row;
 				flex-wrap: nowrap;
@@ -323,13 +324,24 @@
 
 			<div id="ocr_results">
 				<fieldset>
-					<legend>Frame Data</legend>
-					<dl id="frame_data"></dl>
+					<legend>Status</legend>
+					<dl id="ocr_status">
+						<dt>Device</dt>
+						<dd id="status_device_name"></dd>
+						<dt>Settings</dt>
+						<dd id="status_resolution_fps"></dd>
+					</dl>
 				</fieldset>
-				<fieldset>
-					<legend>OCR Performance (in ms)</legend>
-					<dl id="perf_data"></dl>
-				</fieldset>
+				<div id="ocr_results_row2">
+					<fieldset>
+						<legend>Frame Data</legend>
+						<dl id="frame_data"></dl>
+					</fieldset>
+					<fieldset>
+						<legend>OCR Performance (in ms)</legend>
+						<dl id="perf_data"></dl>
+					</fieldset>
+				</div>
 			</div>
 
 			<div id="calibration">
