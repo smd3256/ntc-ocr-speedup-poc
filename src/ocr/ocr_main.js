@@ -127,6 +127,9 @@ const tabsContainer = document.querySelector('#tabs'),
 	perf_data = document.querySelector('#perf_data'),
 	status_device_name = document.querySelector('#status_device_name'),
 	status_resolution_fps = document.querySelector('#status_resolution_fps'),
+	status_skipped_frames = document.querySelector('#status_skipped_frames'),
+	status_reset_skip_count = document.querySelector('#status_reset_skip_count'),
+	skip_frames = document.querySelector('#skip_frames'),
 	capture = document.querySelector('#capture'),
 	adjustments = document.querySelector('#adjustments'),
 	image_corrections = document.querySelector('#image_corrections'),
@@ -148,8 +151,12 @@ let config;
 let connection;
 let pending_calibration = false;
 let in_calibration = false;
-
 let device_label_by_id = {};
+
+status_reset_skip_count.addEventListener('click', () => {
+	skipped_frames_count = 0;
+	status_skipped_frames.textContent = skipped_frames_count;
+});
 
 device_selector.addEventListener('change', evt => {
 	config.device_id = device_selector.value;
@@ -966,7 +973,9 @@ function updateDeviceList(devices) {
 
 		return device;
 	});
-	device_label_by_id = Object.fromEntries(devices.map(camera => [camera.deviceId, camera.label]));
+	device_label_by_id = Object.fromEntries(
+		devices.map(camera => [camera.deviceId, camera.label])
+	);
 
 	const default_devices = [
 		{
@@ -1251,7 +1260,9 @@ async function startCapture(stream) {
 		}@${settings.frameRate.toFixed(1)}fps`
 	);
 
-	status_resolution_fps.textContent = `${settings.width}x${settings.height} ${settings.frameRate.toFixed(1)}fps`;
+	status_resolution_fps.textContent = `${settings.width}x${
+		settings.height
+	} ${settings.frameRate.toFixed(1)}fps`;
 
 	if (show_parts.checked) {
 		adjustments.style.display = 'block';
@@ -1325,6 +1336,9 @@ function stopUnfocusedAlarm() {
 	window.removeEventListener('focus', stopUnfocusedAlarm);
 }
 
+let capture_running = false;
+let skipped_frames_count = 0;
+
 async function captureFrame() {
 	++frame_count;
 
@@ -1343,6 +1357,13 @@ async function captureFrame() {
 	}
 
 	last_frame_time = now;
+
+	if (capture_running && skip_frames.checked) {
+		skipped_frames_count++;
+		status_skipped_frames.textContent = skipped_frames_count;
+		return;
+	}
+	capture_running = true;
 
 	try {
 		let bitmap;
@@ -1363,11 +1384,12 @@ async function captureFrame() {
 		performance.mark('capture_end');
 
 		if (bitmap) {
-			game_tracker.processFrame(bitmap);
+			await game_tracker.processFrame(bitmap);
 		}
 	} catch (err) {
 		console.error(err);
 	}
+	capture_running = false;
 }
 
 function updateCanvasSizeIfNeeded(canvas, w, h) {

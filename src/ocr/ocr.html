@@ -290,6 +290,18 @@
 							Save Last Game's Palette
 						</button>
 					</div>
+					<div
+						title="Use Web Worker to provide stable interval even when the tab is unfocused"
+					>
+						<label for="use_worker_for_interval"
+							>Use Web Worker for interval</label
+						>
+						<input type="checkbox" id="use_worker_for_interval" />
+					</div>
+					<div title="Enable skipping frames when OCR cannot keep up with fps">
+						<label for="skip_frames">Enable frameskip</label>
+						<input type="checkbox" id="skip_frames" checked />
+					</div>
 					<div id="timer_control" class="is-hidden">
 						<button id="start_timer">Start Timer</button>
 						for
@@ -330,6 +342,10 @@
 						<dd id="status_device_name"></dd>
 						<dt>Settings</dt>
 						<dd id="status_resolution_fps"></dd>
+						<dt>Skipped frames</dt>
+						<dd id="status_skipped_frames">0</dd>
+						<dt></dt>
+						<dd><button id="status_reset_skip_count">reset</button></dd>
 					</dl>
 				</fieldset>
 				<div id="ocr_results_row2">
@@ -363,15 +379,6 @@
 					<div>
 						<label for="score7">7 digits score</label>
 						<input type="checkbox" id="score7" />
-					</div>
-
-					<div
-						title="Use Web Worker to provide stable interval even when the tab is unfocused"
-					>
-						<label for="use_worker_for_interval"
-							>Use Web Worker for interval</label
-						>
-						<input type="checkbox" id="use_worker_for_interval" />
 					</div>
 
 					<div>
