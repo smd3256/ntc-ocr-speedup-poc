@@ -37,8 +37,6 @@ export default class GameTracker {
 		this.frame_buffer = [];
 		this.score_fixer = new ScoreFixer();
 
-		this.tetris_ocr.onMessage = this._prefillFrameBuffer;
-
 		this.gameid = this.getNextGameId();
 		this.in_game = false;
 		this.start_level = 0;
@@ -96,7 +94,10 @@ export default class GameTracker {
 
 	async processFrame(bitmap) {
 		// ======= OCR step 1 (Sanitize)
-		const last_frame = this.tetris_ocr.processsFrameStep1(bitmap);
+		const last_frame = await this.tetris_ocr.processFrameStep1(bitmap);
+		if (!last_frame) {
+			return null;
+		}
 
 		if (this.frame_buffer.length < BUFFER_MAXSIZE) {
 			this.frame_buffer.push(last_frame);
@@ -303,7 +304,7 @@ export default class GameTracker {
 		const level = this._getLevelFromLines(lines, dispatch_frame.level); // this is no longer OCR!
 
 		const { field, color1, color2, color3 } =
-			await this.tetris_ocr.processsFrameStep2(dispatch_frame, level);
+			await this.tetris_ocr.processFrameStep2(dispatch_frame, level);
 
 		if (level !== null) {
 			// We compute a palette for the setup that can be saved later

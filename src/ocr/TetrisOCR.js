@@ -67,10 +67,23 @@ const GYM_PAUSE_CROP_RELATIVE_TO_FIELD = [37, 47, 22, 1];
 const SHINE_LUMA_THRESHOLD = 75; // Since shine is white, should this threshold be higher?
 const GYM_PAUSE_LUMA_THRESHOLD = 75;
 
-export default class TetrisOCR extends EventTarget {
+export default class TetrisOCR {
 	constructor(templates, palettes, config) {
-		super();
+		this.ocr_impl = new cpuTetrisOCRImpl(templates, palettes, config);
+	}
+	setConfig(config) {
+		this.ocr_impl.setConfig(config);
+	}
+	async processFrameStep1(frame) {
+		return this.ocr_impl.processFrameStep1(frame);
+	}
+	async processFrameStep2(partial_frame, level) {
+		return this.ocr_impl.processFrameStep2(partial_frame, level);
+	}
+}
 
+export class cpuTetrisOCRImpl {
+	constructor(templates, palettes, config) {
 		this.templates = templates;
 		this.palettes = palettes;
 		this.setConfig(config);
@@ -284,7 +297,7 @@ export default class TetrisOCR extends EventTarget {
 		this.updateCaptureContextFilters();
 	}
 
-	processsFrameStep1(frame) {
+	processFrameStep1(frame) {
 		if (!this.capture_canvas_ctx || this.pending_capture_reinit) {
 			this.initCaptureContext(frame);
 		}
@@ -328,7 +341,7 @@ export default class TetrisOCR extends EventTarget {
 		return res;
 	}
 
-	async processsFrameStep2(partial_frame, level) {
+	async processFrameStep2(partial_frame, level) {
 		const res = {};
 		const level_units = level % 10;
 
