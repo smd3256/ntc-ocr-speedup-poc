@@ -298,9 +298,9 @@
 						>
 						<input type="checkbox" id="use_worker_for_interval" />
 					</div>
-					<div title="Enable skipping frames when OCR cannot keep up with fps">
-						<label for="skip_frames">Enable frameskip</label>
-						<input type="checkbox" id="skip_frames" checked />
+					<div title="Enable dropping frames when OCR cannot keep up with fps">
+						<label for="drop_frames">Enable framedrop</label>
+						<input type="checkbox" id="drop_frames" checked />
 					</div>
 					<div id="timer_control" class="is-hidden">
 						<button id="start_timer">Start Timer</button>
@@ -342,10 +342,10 @@
 						<dd id="status_device_name"></dd>
 						<dt>Settings</dt>
 						<dd id="status_resolution_fps"></dd>
-						<dt>Skipped frames</dt>
-						<dd id="status_skipped_frames">0</dd>
+						<dt>Dropped frames</dt>
+						<dd id="status_dropped_frames">0</dd>
 						<dt></dt>
-						<dd><button id="status_reset_skip_count">reset</button></dd>
+						<dd><button id="status_reset_drop_count">reset</button></dd>
 					</dl>
 				</fieldset>
 				<div id="ocr_results_row2">

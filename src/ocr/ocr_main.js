@@ -127,9 +127,9 @@ const tabsContainer = document.querySelector('#tabs'),
 	perf_data = document.querySelector('#perf_data'),
 	status_device_name = document.querySelector('#status_device_name'),
 	status_resolution_fps = document.querySelector('#status_resolution_fps'),
-	status_skipped_frames = document.querySelector('#status_skipped_frames'),
-	status_reset_skip_count = document.querySelector('#status_reset_skip_count'),
-	skip_frames = document.querySelector('#skip_frames'),
+	status_dropped_frames = document.querySelector('#status_dropped_frames'),
+	status_reset_drop_count = document.querySelector('#status_reset_drop_count'),
+	drop_frames = document.querySelector('#drop_frames'),
 	capture = document.querySelector('#capture'),
 	adjustments = document.querySelector('#adjustments'),
 	image_corrections = document.querySelector('#image_corrections'),
@@ -153,9 +153,9 @@ let pending_calibration = false;
 let in_calibration = false;
 let device_label_by_id = {};
 
-status_reset_skip_count.addEventListener('click', () => {
-	skipped_frames_count = 0;
-	status_skipped_frames.textContent = skipped_frames_count;
+status_reset_drop_count.addEventListener('click', () => {
+	dropped_frames_count = 0;
+	status_dropped_frames.textContent = dropped_frames_count;
 });
 
 device_selector.addEventListener('change', evt => {
@@ -1342,7 +1342,7 @@ function stopUnfocusedAlarm() {
 }
 
 let capture_running = false;
-let skipped_frames_count = 0;
+let dropped_frames_count = 0;
 
 async function captureFrame() {
 	++frame_count;
@@ -1363,9 +1363,9 @@ async function captureFrame() {
 
 	last_frame_time = now;
 
-	if (capture_running && skip_frames.checked) {
-		skipped_frames_count++;
-		status_skipped_frames.textContent = skipped_frames_count;
+	if (capture_running && drop_frames.checked) {
+		dropped_frames_count++;
+		status_dropped_frames.textContent = dropped_frames_count;
 		return;
 	}
 	capture_running = true;
