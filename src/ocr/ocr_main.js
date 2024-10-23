@@ -669,6 +669,11 @@ function onShowPartsChanged() {
 		// nothing to do here
 	}
 
+	config.show_parts = show_parts.checked;
+	if (game_tracker) {
+		game_tracker.setConfig(config);
+	}
+
 	if (show_parts.checked) {
 		resetShowPartsTimer();
 	}
