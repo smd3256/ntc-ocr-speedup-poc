@@ -2,7 +2,10 @@ import { timingDecorator } from '/ocr/utils.js';
 import { bicubic, crop, luma } from '/ocr/image_tools.js';
 import { rgb2lab } from '/ocr/utils.js';
 
-const PATTERN_MAX_INDEXES = {
+import { WebGL2OCR } from '/ocr/WebGL2OCR.js';
+import { CPUOCR, ComparingOCR } from '/ocr/CPUOCR.js';
+
+export const PATTERN_MAX_INDEXES = {
 	B: 3, // null, 0, 1 (Binary)
 	T: 4, // null, 0, 1, 2 (Ternary)
 	Q: 6, // null, 0, 1, 2, 3, 4 (Quintic)
@@ -11,7 +14,7 @@ const PATTERN_MAX_INDEXES = {
 	A: 17, // null, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F (Alphanums)
 };
 
-const PERF_METHODS = [
+export const PERF_METHODS = [
 	'getSourceImageData',
 	'scanScore',
 	'scanLevel',
@@ -29,8 +32,8 @@ const PERF_METHODS = [
 	'scanGymPause',
 ];
 
-const DEFAULT_COLOR_0 = [0x00, 0x00, 0x00];
-const DEFAULT_COLOR_1 = [0xf0, 0xf0, 0xf0];
+export const DEFAULT_COLOR_0 = [0x00, 0x00, 0x00];
+export const DEFAULT_COLOR_1 = [0xf0, 0xf0, 0xf0];
 
 function getDigitsWidth(n) {
 	// width per digit is 8px times 2
@@ -40,7 +43,7 @@ function getDigitsWidth(n) {
 }
 
 // Resize areas based on logical NES pixels (2x for digits)
-const TASK_RESIZE = {
+export const TASK_RESIZE = {
 	score: [getDigitsWidth(6), 14],
 	score7: [getDigitsWidth(7), 14],
 	level: [getDigitsWidth(2), 14],
@@ -62,10 +65,10 @@ const TASK_RESIZE = {
 // then again... We coud argue everything *should* be 100% connected to the calibration of the field,
 // so... is it really wise to not allow user-controlled fine-tuning? That plus being an internal process, we
 // are not able to show what we are capturing for the gym pause
-const GYM_PAUSE_CROP_RELATIVE_TO_FIELD = [37, 47, 22, 1];
+export const GYM_PAUSE_CROP_RELATIVE_TO_FIELD = [37, 47, 22, 1];
 
-const SHINE_LUMA_THRESHOLD = 75; // Since shine is white, should this threshold be higher?
-const GYM_PAUSE_LUMA_THRESHOLD = 75;
+export const SHINE_LUMA_THRESHOLD = 75; // Since shine is white, should this threshold be higher?
+export const GYM_PAUSE_LUMA_THRESHOLD = 75;
 
 export default class TetrisOCR {
 	constructor(templates, palettes, config) {
@@ -82,7 +85,7 @@ export default class TetrisOCR {
 	}
 }
 
-export class cpuTetrisOCRImpl {
+export class originalTetrisOCRImpl {
 	constructor(templates, palettes, config) {
 		this.templates = templates;
 		this.palettes = palettes;
