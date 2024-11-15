@@ -46,7 +46,11 @@ export class CPUOCR extends SheetOCRBase {
 		this.frame_canvas_ctx.imageSmoothingEnabled = false;
 
 		// Canvas for sheet
+		/*if (this.sheet_canvas) {
+			document.body.removeChild(this.sheet_canvas);
+		}*/
 		this.sheet_canvas = document.createElement('canvas');
+		//document.body.appendChild(this.sheet_canvas);
 		[this.sheet_canvas.width, this.sheet_canvas.height] =
 			this.config.sheet_size;
 		this.sheet_canvas_ctx = this.sheet_canvas.getContext('2d', {
