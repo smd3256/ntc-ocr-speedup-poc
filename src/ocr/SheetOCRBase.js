@@ -24,7 +24,6 @@ export class SheetOCRBase {
 		this.config = config;
 		this.palette = this.palettes?.[config.palette]; // will reset to undefined when needed
 
-		this.pending_capture_reinit = true;
 		this.fixPalette();
 
 		const bounds = {

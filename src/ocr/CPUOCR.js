@@ -9,6 +9,7 @@ export class CPUOCR extends SheetOCRBase {
 	}
 	setConfig(config) {
 		super.setConfig(config);
+		this.pending_capture_reinit = true;
 		this.updateCaptureContextFilters();
 	}
 	updateCaptureContextFilters() {
