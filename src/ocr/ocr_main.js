@@ -640,6 +640,7 @@ video.addEventListener('click', async evt => {
 	config.score7 = false;
 
 	saveConfig(config);
+	config.show_parts = true;
 	trackAndSendFrames();
 
 	if (video.ntcType === 'device') {
@@ -669,9 +670,11 @@ function onShowPartsChanged() {
 		// nothing to do here
 	}
 
-	config.show_parts = show_parts.checked;
-	if (game_tracker) {
-		game_tracker.setConfig(config);
+	if (config.show_parts !== show_parts.checked) {
+		config.show_parts = show_parts.checked;
+		if (game_tracker) {
+			game_tracker.setConfig(config);
+		}
 	}
 
 	if (show_parts.checked) {
@@ -1365,6 +1368,7 @@ async function captureFrame() {
 
 	if (capture_running && drop_frames.checked) {
 		dropped_frames_count++;
+		performance.mark('framedrop');
 		status_dropped_frames.textContent = dropped_frames_count;
 		return;
 	}
@@ -2265,6 +2269,7 @@ let timer = stdTimer;
 
 	if (hasConfig()) {
 		config = loadConfig();
+		config.show_parts = true;
 
 		// transformation of color numbers for old configs
 		// TODO: delete when everyone is using the new config

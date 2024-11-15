@@ -1,91 +1,17 @@
-import { timingDecorator } from '/ocr/utils.js';
-import { bicubic, crop, luma } from '/ocr/image_tools.js';
+import {
+	PATTERN_MAX_INDEXES,
+	PERF_METHODS,
+	DEFAULT_COLOR_0,
+	DEFAULT_COLOR_1,
+	TASK_RESIZE,
+	GYM_PAUSE_CROP_RELATIVE_TO_FIELD,
+	SHINE_LUMA_THRESHOLD,
+	GYM_PAUSE_LUMA_THRESHOLD,
+} from '/ocr/TetrisOCR.js';
+import { crop, luma } from '/ocr/image_tools.js';
 import { rgb2lab } from '/ocr/utils.js';
 
-import { WebGL2OCR } from '/ocr/WebGL2OCR.js';
-import { CPUOCR, ComparingOCR } from '/ocr/CPUOCR.js';
-
-export const PATTERN_MAX_INDEXES = {
-	B: 3, // null, 0, 1 (Binary)
-	T: 4, // null, 0, 1, 2 (Ternary)
-	Q: 6, // null, 0, 1, 2, 3, 4 (Quintic)
-	D: 11, // null, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 (Digits)
-	L: 13, // null, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B (Level)
-	A: 17, // null, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F (Alphanums)
-};
-
-export const PERF_METHODS = [
-	'getSourceImageData',
-	'scanScore',
-	'scanLevel',
-	'scanLines',
-	'scanColor1',
-	'scanColor2',
-	'scanColor3',
-	'scanPreview',
-	'scanField',
-	'scanPieceStats',
-
-	'scanInstantDas',
-	'scanCurPieceDas',
-	'scanCurPiece',
-	'scanGymPause',
-];
-
-export const DEFAULT_COLOR_0 = [0x00, 0x00, 0x00];
-export const DEFAULT_COLOR_1 = [0xf0, 0xf0, 0xf0];
-
-function getDigitsWidth(n) {
-	// width per digit is 8px times 2
-	// and for last digit, we ignore the 1px (times 2)
-	// border on the right, hence -2
-	return 16 * n - 2;
-}
-
-// Resize areas based on logical NES pixels (2x for digits)
-export const TASK_RESIZE = {
-	score: [getDigitsWidth(6), 14],
-	score7: [getDigitsWidth(7), 14],
-	level: [getDigitsWidth(2), 14],
-	lines: [getDigitsWidth(3), 14],
-	field: [79, 159],
-	preview: [31, 15],
-	cur_piece: [23, 12],
-	instant_das: [getDigitsWidth(2), 14],
-	cur_piece_das: [getDigitsWidth(2), 14],
-	color1: [5, 5],
-	color2: [5, 5],
-	color3: [5, 5],
-	stats: [getDigitsWidth(3), 14 * 7 + 14 * 7], // height captures all the individual stats...
-	piece_count: [getDigitsWidth(3), 14],
-	gym_pause: [22, 1],
-};
-
-// Not supplied as user control, because Gym Pause is 100% connected to the calibration of the field
-// then again... We coud argue everything *should* be 100% connected to the calibration of the field,
-// so... is it really wise to not allow user-controlled fine-tuning? That plus being an internal process, we
-// are not able to show what we are capturing for the gym pause
-export const GYM_PAUSE_CROP_RELATIVE_TO_FIELD = [37, 47, 22, 1];
-
-export const SHINE_LUMA_THRESHOLD = 75; // Since shine is white, should this threshold be higher?
-export const GYM_PAUSE_LUMA_THRESHOLD = 75;
-
-export default class TetrisOCR {
-	constructor(templates, palettes, config) {
-		this.ocr_impl = new cpuTetrisOCRImpl(templates, palettes, config);
-	}
-	setConfig(config) {
-		this.ocr_impl.setConfig(config);
-	}
-	async processFrameStep1(frame) {
-		return this.ocr_impl.processFrameStep1(frame);
-	}
-	async processFrameStep2(partial_frame, level) {
-		return this.ocr_impl.processFrameStep2(partial_frame, level);
-	}
-}
-
-export class originalTetrisOCRImpl {
+export class SheetOCRBase {
 	constructor(templates, palettes, config) {
 		this.templates = templates;
 		this.palettes = palettes;
@@ -93,27 +19,11 @@ export class originalTetrisOCRImpl {
 
 		this.digit_img = new ImageData(14, 14); // 2x for better matching
 		this.shine_img = new ImageData(2, 3);
-
-		// decorate relevant methods to capture timings
-		PERF_METHODS.forEach(name => {
-			const method = this[name].bind(this);
-			this[name] = timingDecorator(name, method);
-		});
 	}
-
-	/*
-	 * processConfig()
-	 * 1. Calculate the overal crop area based on the individual task crop areas
-	 * 2. Instantiate ImageData objects for each cropped and resize job, so they can:
-	 *    a. be reused without memory allocation
-	 *    b. be shared via the config reference with client app (say for display of the areas)
-	 *
-	 */
 	setConfig(config) {
 		this.config = config;
 		this.palette = this.palettes?.[config.palette]; // will reset to undefined when needed
 
-		this.pending_capture_reinit = true;
 		this.fixPalette();
 
 		const bounds = {
@@ -189,6 +99,70 @@ export class originalTetrisOCRImpl {
 			task.scale_img = new ImageData(...resize_tuple);
 		}
 
+		// Calculate sheet position/size
+		const sheet_coordinates = {};
+		const SHEET_X_GAP = 1;
+		const SHEET_Y_GAP = 1;
+		let x = 0,
+			y = DEFAULT_COLOR_0;
+		// Field
+		sheet_coordinates.field = [0, 0, ...TASK_RESIZE.field];
+		// GYM Pause
+		sheet_coordinates.gym_pause = [
+			0,
+			TASK_RESIZE.field[1] + SHEET_Y_GAP,
+			...TASK_RESIZE.gym_pause,
+		];
+		// Stats
+		[x, y] = [TASK_RESIZE.field[0] + SHEET_X_GAP, 0];
+		for (const c of ['T', 'J', 'Z', 'O', 'S', 'L', 'I']) {
+			sheet_coordinates[c] = [x, y, ...TASK_RESIZE.lines];
+			y += TASK_RESIZE.score[1] + SHEET_Y_GAP;
+		}
+		// lines, level, preview, curpiece
+		for (const c of ['lines', 'level', 'preview', 'cur_piece']) {
+			sheet_coordinates[c] = [x, y, ...TASK_RESIZE[c]];
+			y += TASK_RESIZE[c][1] + SHEET_Y_GAP;
+		}
+		// Colors
+		[x, y] = [
+			sheet_coordinates.preview[0] + sheet_coordinates.preview[2] + SHEET_X_GAP,
+			sheet_coordinates.lines[1] + sheet_coordinates.lines[3] + SHEET_Y_GAP,
+		];
+		for (const c of ['color1', 'color2', 'color3']) {
+			sheet_coordinates[c] = [x, y, ...TASK_RESIZE[c]];
+			y += TASK_RESIZE[c][1] + SHEET_Y_GAP;
+		}
+		// score
+		[x, y] = [
+			0,
+			Math.max(
+				sheet_coordinates.gym_pause[1] + sheet_coordinates.gym_pause[3],
+				sheet_coordinates.cur_piece[1] + sheet_coordinates.cur_piece[3]
+			) + SHEET_Y_GAP,
+		];
+		sheet_coordinates.score = [
+			x,
+			y,
+			...(config.score7 ? TASK_RESIZE.score7 : TASK_RESIZE.score),
+		];
+		y += TASK_RESIZE.score[1] + SHEET_Y_GAP;
+		// das, piece
+		for (const c of ['instant_das', 'cur_piece_das', 'piece_count']) {
+			sheet_coordinates[c] = [x, y, ...TASK_RESIZE[c]];
+			x += TASK_RESIZE[c][0] + SHEET_X_GAP;
+		}
+		let sw = 1,
+			sh = 1;
+		for (const [name, xywh] of Object.entries(sheet_coordinates)) {
+			if (name in all_tasks) {
+				all_tasks[name].sheet_coordinates = xywh;
+			}
+			sw = Math.max(sw, xywh[0] + xywh[2]);
+			sh = Math.max(sh, xywh[1] + xywh[3]);
+		}
+		this.config.sheet_size = [sw, sh];
+
 		this.config.capture_bounds = bounds;
 		this.config.capture_area = {
 			x: bounds.left,
@@ -196,10 +170,86 @@ export class originalTetrisOCRImpl {
 			w: bounds.right - bounds.left,
 			h: bounds.bottom - bounds.top,
 		};
-
-		this.updateCaptureContextFilters();
 	}
+	async processFrameStep1_ocr(source_img, sheet_img) {
+		// ocr part only
+		const res = {
+			source_img,
+			sheet_img,
+			score: this.scanScore(source_img, sheet_img),
+			level: this.scanLevel(source_img, sheet_img),
+			lines: this.scanLines(source_img, sheet_img),
+			preview: this.scanPreview(source_img, sheet_img),
+		};
 
+		if (this.config.tasks.instant_das) {
+			// assumes all 3 das tasks are a unit for the das trainer rom
+			res.instant_das = this.scanInstantDas(source_img, sheet_img);
+			res.cur_piece_das = this.scanCurPieceDas(source_img, sheet_img);
+			res.cur_piece = this.scanCurPiece(source_img, sheet_img);
+		}
+
+		if (this.config.tasks.T) {
+			Object.assign(res, this.scanPieceStats(source_img, sheet_img));
+		}
+
+		if (this.gym_pause_task) {
+			res.gym_pause = this.scanGymPause(source_img, sheet_img);
+		}
+
+		return res;
+	}
+	async processFrameStep2(partial_frame, level) {
+		const res = {};
+		const level_units = level % 10;
+
+		// color are either supplied from palette or read, there's no other choice
+		if (this.palette) {
+			[res.color1, res.color2, res.color3] = this.palette[level_units];
+		} else {
+			// assume tasks color1 and color2 are set
+			res.color2 = this.scanColor2(
+				partial_frame.source_img,
+				partial_frame.sheet_img
+			);
+			res.color3 = this.scanColor3(
+				partial_frame.source_img,
+				partial_frame.sheet_img
+			);
+
+			if (this.config.tasks.color1) {
+				res.color1 = this.scanColor1(
+					partial_frame.source_img,
+					partial_frame.sheet_img
+				);
+			} else {
+				res.color1 = DEFAULT_COLOR_1;
+			}
+		}
+
+		const colors = [res.color1, res.color2, res.color3];
+
+		if (level_units != 6 && level_units != 7) {
+			// INFO: colors for level X6 and X7 are terrible on Retron, so we don't add black to ensure they don't get mixed up
+			// When we use a palette
+			// TOCHECK: is this still needed now that we work in lab color space?
+			colors.unshift(DEFAULT_COLOR_0); // add black
+		}
+
+		res.field = await this.scanField(
+			partial_frame.source_img,
+			partial_frame.sheet_img,
+			colors
+		);
+
+		// round the colors if needed
+		if (res.color2) {
+			res.color2 = res.color2.map(v => Math.round(v));
+			res.color3 = res.color3.map(v => Math.round(v));
+		}
+
+		return res;
+	}
 	fixPalette() {
 		if (!this.palette) return;
 
@@ -211,7 +261,15 @@ export class originalTetrisOCRImpl {
 			return colors;
 		});
 	}
+	getCropScaleImage(source_img, sheet_img, task) {
+		if (source_img) {
+			const [cx, cy, cw, ch] = this.getCropCoordinates(task);
+			crop(source_img, cx, cy, cw, ch, task.crop_img);
+		}
 
+		const [sx, sy, sw, sh] = task.sheet_coordinates;
+		crop(sheet_img, sx, sy, sw, sh, task.scale_img);
+	}
 	getDigit(pixel_data, max_check_index, is_red) {
 		const sums = new Float64Array(max_check_index);
 		const size = pixel_data.length >>> 2;
@@ -245,208 +303,48 @@ export class originalTetrisOCRImpl {
 
 		return min_idx;
 	}
-
-	updateCaptureContextFilters() {
-		if (!this.capture_canvas_ctx) return;
-		if (!this.config) return;
-
-		const filters = [];
-
-		if (this.config.brightness && this.config.brightness > 1) {
-			filters.push(`brightness(${this.config.brightness})`);
-		}
-
-		if (this.config.contrast && this.config.contrast !== 1) {
-			filters.push(`contrast(${this.config.contrast})`);
-		}
-
-		if (filters.length) {
-			this.capture_canvas_ctx.filter = filters.join(' ');
-		} else {
-			this.capture_canvas_ctx.filter = 'none';
-		}
+	scanScore(source_img, sheet_img) {
+		return this.ocrDigits(source_img, sheet_img, this.config.tasks.score);
 	}
 
-	initCaptureContext(frame) {
-		this.pending_capture_reinit = false;
-		this.capture_canvas = document.createElement('canvas');
-
-		this.capture_canvas.width = frame.width;
-		this.capture_canvas.height =
-			frame.height >> (this.config.use_half_height ? 1 : 0);
-
-		this.capture_canvas_ctx = this.capture_canvas.getContext('2d', {
-			alpha: false,
-			willReadFrequently: true,
-		});
-		this.capture_canvas_ctx.imageSmoothingEnabled = false;
-
-		// On top of the capture context, we need one more canvas for the scaled field
-		// because the performance of OffScreenCanvas are horrible, and same gvoes for the bicubic lib for any image that's not super small :(
-
-		// TODO: get rid of this additional canvas when we can T_T
-		this.scaled_field_canvas = document.createElement('canvas');
-
-		this.scaled_field_canvas.width = TASK_RESIZE.field[0];
-		this.scaled_field_canvas.height = TASK_RESIZE.field[1];
-
-		this.scaled_field_canvas_ctx = this.scaled_field_canvas.getContext('2d', {
-			alpha: false,
-			willReadFrequently: true,
-		});
-		this.scaled_field_canvas_ctx.imageSmoothingEnabled = true;
-		this.scaled_field_canvas_ctx.imageSmoothingQuality = 'medium';
-
-		this.updateCaptureContextFilters();
+	scanLevel(source_img, sheet_img) {
+		return this.ocrDigits(source_img, sheet_img, this.config.tasks.level);
 	}
 
-	processFrameStep1(frame) {
-		if (!this.capture_canvas_ctx || this.pending_capture_reinit) {
-			this.initCaptureContext(frame);
-		}
+	scanLines(source_img, sheet_img) {
+		return this.ocrDigits(source_img, sheet_img, this.config.tasks.lines);
+	}
 
-		performance.mark('start');
-		this.capture_canvas_ctx.drawImage(
-			frame,
-			0,
-			0,
-			frame.width,
-			frame.height >> (this.config.use_half_height ? 1 : 0)
-		);
-		performance.mark('draw_end');
-		performance.measure('draw_frame', 'start', 'draw_end');
+	scanColor2(source_img, sheet_img) {
+		return this.scanColor(source_img, sheet_img, this.config.tasks.color2);
+	}
 
-		const source_img = this.getSourceImageData();
+	scanColor3(source_img, sheet_img) {
+		return this.scanColor(source_img, sheet_img, this.config.tasks.color3);
+	}
 
-		const res = {
+	scanInstantDas(source_img, sheet_img) {
+		return this.ocrDigits(source_img, sheet_img, this.config.tasks.instant_das);
+	}
+
+	scanCurPieceDas(source_img, sheet_img) {
+		return this.ocrDigits(
 			source_img,
-			score: this.scanScore(source_img),
-			level: this.scanLevel(source_img),
-			lines: this.scanLines(source_img),
-			preview: this.scanPreview(source_img),
-		};
-
-		if (this.config.tasks.instant_das) {
-			// assumes all 3 das tasks are a unit for the das trainer rom
-			res.instant_das = this.scanInstantDas(source_img);
-			res.cur_piece_das = this.scanCurPieceDas(source_img);
-			res.cur_piece = this.scanCurPiece(source_img);
-		}
-
-		if (this.config.tasks.T) {
-			Object.assign(res, this.scanPieceStats(source_img));
-		}
-
-		if (this.gym_pause_task) {
-			res.gym_pause = this.scanGymPause(source_img);
-		}
-
-		return res;
+			sheet_img,
+			this.config.tasks.cur_piece_das
+		);
 	}
 
-	async processFrameStep2(partial_frame, level) {
-		const res = {};
-		const level_units = level % 10;
-
-		// color are either supplied from palette or read, there's no other choice
-		if (this.palette) {
-			[res.color1, res.color2, res.color3] = this.palette[level_units];
-		} else {
-			// assume tasks color1 and color2 are set
-			res.color2 = this.scanColor2(partial_frame.source_img);
-			res.color3 = this.scanColor3(partial_frame.source_img);
-
-			if (this.config.tasks.color1) {
-				res.color1 = this.scanColor1(partial_frame.source_img);
-			} else {
-				res.color1 = DEFAULT_COLOR_1;
-			}
-		}
-
-		const colors = [res.color1, res.color2, res.color3];
-
-		if (level_units != 6 && level_units != 7) {
-			// INFO: colors for level X6 and X7 are terrible on Retron, so we don't add black to ensure they don't get mixed up
-			// When we use a palette
-			// TOCHECK: is this still needed now that we work in lab color space?
-			colors.unshift(DEFAULT_COLOR_0); // add black
-		}
-
-		res.field = await this.scanField(partial_frame.source_img, colors);
-
-		// round the colors if needed
-		if (res.color2) {
-			res.color2 = res.color2.map(v => Math.round(v));
-			res.color3 = res.color3.map(v => Math.round(v));
-		}
-
-		return res;
-	}
-
-	scanScore(source_img) {
-		return this.ocrDigits(source_img, this.config.tasks.score);
-	}
-
-	scanLevel(source_img) {
-		return this.ocrDigits(source_img, this.config.tasks.level);
-	}
-
-	scanLines(source_img) {
-		return this.ocrDigits(source_img, this.config.tasks.lines);
-	}
-
-	scanColor2(source_img) {
-		return this.scanColor(source_img, this.config.tasks.color2);
-	}
-
-	scanColor3(source_img) {
-		return this.scanColor(source_img, this.config.tasks.color3);
-	}
-
-	scanInstantDas(source_img) {
-		return this.ocrDigits(source_img, this.config.tasks.instant_das);
-	}
-
-	scanCurPieceDas(source_img) {
-		return this.ocrDigits(source_img, this.config.tasks.cur_piece_das);
-	}
-
-	scanPieceStats(source_img) {
+	scanPieceStats(source_img, sheet_img) {
 		return {
-			T: this.ocrDigits(source_img, this.config.tasks.T),
-			J: this.ocrDigits(source_img, this.config.tasks.J),
-			Z: this.ocrDigits(source_img, this.config.tasks.Z),
-			O: this.ocrDigits(source_img, this.config.tasks.O),
-			S: this.ocrDigits(source_img, this.config.tasks.S),
-			L: this.ocrDigits(source_img, this.config.tasks.L),
-			I: this.ocrDigits(source_img, this.config.tasks.I),
+			T: this.ocrDigits(source_img, sheet_img, this.config.tasks.T),
+			J: this.ocrDigits(source_img, sheet_img, this.config.tasks.J),
+			Z: this.ocrDigits(source_img, sheet_img, this.config.tasks.Z),
+			O: this.ocrDigits(source_img, sheet_img, this.config.tasks.O),
+			S: this.ocrDigits(source_img, sheet_img, this.config.tasks.S),
+			L: this.ocrDigits(source_img, sheet_img, this.config.tasks.L),
+			I: this.ocrDigits(source_img, sheet_img, this.config.tasks.I),
 		};
-	}
-
-	getSourceImageData() {
-		const pixels = this.capture_canvas_ctx.getImageData(
-			this.config.capture_area.x,
-			this.config.capture_area.y,
-			this.config.capture_area.w,
-			this.config.capture_area.h
-		);
-
-		/*
-	const pixels_per_rows = this.config.capture_area.w * 4;
-	const max_rows = this.config.capture_bounds.bottom;
-
-	for (let row_idx = 1; row_idx < max_rows; row_idx++) {
-		pixels.data.copyWithin(
-			pixels_per_rows * row_idx,
-			pixels_per_rows * row_idx * 2,
-			pixels_per_rows * (row_idx * 2 + 1)
-		);
-	}
-	/**/
-
-		this.config.source_img = pixels;
-
-		return pixels;
 	}
 
 	getCropCoordinates(task) {
@@ -460,12 +358,9 @@ export class originalTetrisOCRImpl {
 		];
 	}
 
-	ocrDigits(source_img, task) {
-		const [x, y, w, h] = this.getCropCoordinates(task);
+	ocrDigits(source_img, sheet_img, task) {
+		this.getCropScaleImage(source_img, sheet_img, task);
 		const digits = Array(task.pattern.length);
-
-		crop(source_img, x, y, w, h, task.crop_img);
-		bicubic(task.crop_img, task.scale_img);
 
 		for (let idx = digits.length; idx--; ) {
 			const char = task.pattern[idx];
@@ -513,12 +408,9 @@ export class originalTetrisOCRImpl {
 		});
 	}
 
-	scanPreview(source_img) {
+	scanPreview(source_img, sheet_img) {
 		const task = this.config.tasks.preview;
-		const [x, y, w, h] = this.getCropCoordinates(task);
-
-		crop(source_img, x, y, w, h, task.crop_img);
-		bicubic(task.crop_img, task.scale_img);
+		this.getCropScaleImage(source_img, sheet_img, task);
 
 		// Trying side i blocks
 		if (
@@ -581,15 +473,12 @@ export class originalTetrisOCRImpl {
 		return null;
 	}
 
-	scanCurPiece(source_img) {
+	scanCurPiece(source_img, sheet_img) {
 		const task = this.config.tasks.cur_piece;
-		const [x, y, w, h] = this.getCropCoordinates(task);
+		this.getCropScaleImage(source_img, sheet_img, task);
 
 		// curPieces are not vertically aligned on the top row
 		// L and J are rendered 1 pixel higher than S, Z, T, O
-
-		crop(source_img, x, y, w, h, task.crop_img);
-		bicubic(task.crop_img, task.scale_img);
 
 		// Trying side i blocks
 		if (
@@ -661,12 +550,10 @@ export class originalTetrisOCRImpl {
 		return null;
 	}
 
-	scanColor1(source_img) {
+	scanColor1(source_img, sheet_img) {
 		const task = this.config.tasks.color1;
-		const xywh_coordinates = this.getCropCoordinates(task);
-
-		crop(source_img, ...xywh_coordinates, task.crop_img);
-		bicubic(task.crop_img, task.scale_img);
+		const xywh_coordinates = task.sheet_coordinates;
+		this.getCropScaleImage(source_img, sheet_img, task);
 
 		// I tried selecting the pixel with highest luma but that didn't work.
 		// On capture cards with heavy color bleeding, it's inaccurate.
@@ -702,14 +589,10 @@ export class originalTetrisOCRImpl {
 	/**/
 	}
 
-	scanColor(source_img, task) {
+	scanColor(source_img, sheet_img, task) {
 		// to get the average color, we take the average of squares, or it might be too dark
 		// see: https://www.youtube.com/watch?v=LKnqECcg6Gw
-
-		const xywh_coordinates = this.getCropCoordinates(task);
-
-		crop(source_img, ...xywh_coordinates, task.crop_img);
-		bicubic(task.crop_img, task.scale_img);
+		this.getCropScaleImage(source_img, sheet_img, task);
 
 		const row_width = task.scale_img.width;
 		const pix_refs = [
@@ -735,17 +618,14 @@ export class originalTetrisOCRImpl {
 			.map(v => Math.sqrt(v / pix_refs.length));
 	}
 
-	scanGymPause(source_img) {
+	scanGymPause(source_img, sheet_img) {
 		// Scanning the pause text scans the bottom of the letter 'U', "S", and "E" of the text "PAUSE"
 		// that's because the bottom of the letters overlaps with block margins, which are black
 		// When the pause text is not visible, luma on these overlap is expected to be very low
 		// When pause text is visible, luma is expected to be high.
 
 		const task = this.gym_pause_task;
-		const xywh_coordinates = this.getCropCoordinates(task);
-
-		crop(source_img, ...xywh_coordinates, task.crop_img);
-		bicubic(task.crop_img, task.scale_img);
+		this.getCropScaleImage(source_img, sheet_img, task);
 
 		const pix_refs = [
 			// 1 pixel for U
@@ -771,46 +651,16 @@ export class originalTetrisOCRImpl {
 		return [Math.round(avg_luma), avg_luma > GYM_PAUSE_LUMA_THRESHOLD];
 	}
 
-	async scanField(source_img, _colors) {
+	async scanField(source_img, sheet_img, _colors) {
 		// Note: We work in the square of colors domain
 		// see: https://www.youtube.com/watch?v=LKnqECcg6Gw
 		const task = this.config.tasks.field;
-		const xywh_coordinates = this.getCropCoordinates(task);
 		const colors = _colors.map(rgb2lab); // we operate in Lab color space
 		const index_offset = _colors.length == 4 ? 0 : 1; // length of colors is either 3 or 4
 
-		// crop is not needed, but done anyway to share task captured area with caller app
-		crop(source_img, ...xywh_coordinates, task.crop_img);
-
-		/*
-	// the 2 lines below show what's actually needed: a simple crop and scale on the source image
-	// but cubic scaling in JS is MUCH slower than with native code, so we use canvas instead
-	bicubic(task.crop_img, task.scale_img);
-	const field_img = task.scale_img;
-	/**/
-
-		/**/
-		// crop and scale with canva
-		const original_field_img = await createImageBitmap(
-			source_img,
-			...xywh_coordinates
-		);
-
-		this.scaled_field_canvas_ctx.drawImage(
-			original_field_img,
-			0,
-			0,
-			...TASK_RESIZE.field
-		);
-
-		const field_img = this.scaled_field_canvas_ctx.getImageData(
-			0,
-			0,
-			...TASK_RESIZE.field
-		);
-
 		// writing into scale_img is not needed, but done anyway to share area with caller app
-		task.scale_img.data.set(field_img.data);
+		this.getCropScaleImage(source_img, sheet_img, task);
+		const field_img = task.scale_img;
 		/**/
 
 		// Make a memory efficient array for our needs
