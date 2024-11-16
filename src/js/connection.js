@@ -104,7 +104,10 @@ export default class Connection {
 		this._clearSocket();
 		this.broken = true;
 		this.onBreak();
-		setTimeout(this.connect, 5000); // TODO: exponential backoff
+		this.retry_timeout = setTimeout(() => {
+			delete this.retry_timeout;
+			this.connect();
+		}, 5000); // TODO: exponential backoff
 	}
 
 	_clearSocket() {
@@ -135,6 +138,9 @@ export default class Connection {
 
 	close() {
 		this._clearSocket();
+
+		clearTimeout(this.retry_timeout);
+		delete this.retry_timeout;
 
 		delete this.onBreak;
 		delete this.onResume;

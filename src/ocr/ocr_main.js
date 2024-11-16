@@ -130,6 +130,7 @@ const tabsContainer = document.querySelector('#tabs'),
 	status_dropped_frames = document.querySelector('#status_dropped_frames'),
 	status_reset_drop_count = document.querySelector('#status_reset_drop_count'),
 	drop_frames = document.querySelector('#drop_frames'),
+	ntc_url = document.querySelector('#ntc_url'),
 	capture = document.querySelector('#capture'),
 	adjustments = document.querySelector('#adjustments'),
 	image_corrections = document.querySelector('#image_corrections'),
@@ -316,13 +317,22 @@ const API = {
 	},
 };
 
+ntc_url.addEventListener('change', onNtcUrlChanged);
+
+function onNtcUrlChanged() {
+	config.ntc_url = ntc_url.value;
+	saveConfig(config);
+	connect();
+}
+
 function connect() {
-	return;
 	if (connection) {
 		connection.close();
 	}
 
-	connection = new Connection();
+	if (!config.ntc_url) return;
+
+	connection = new Connection(config.ntc_url);
 
 	connection.onMessage = function (frame) {
 		try {
@@ -838,6 +848,14 @@ function onFocusAlarmChanged() {
 }
 
 focus_alarm.addEventListener('change', onFocusAlarmChanged);
+
+function onFrameDropChanged() {
+	config.drop_frames = !!drop_frames.checked;
+
+	saveConfig(config);
+}
+
+drop_frames.addEventListener('change', onFrameDropChanged);
 
 set_ready.addEventListener('click', () => {
 	if (connection) {
@@ -1771,6 +1789,8 @@ function saveConfig(config) {
 		score7: config.score7,
 		use_half_height: config.use_half_height,
 		use_worker_for_interval: config.use_worker_for_interval,
+		drop_frames: config.drop_frames,
+		ntc_url: config.ntc_url,
 		tasks: {},
 	};
 
@@ -2307,6 +2327,9 @@ let timer = stdTimer;
 		const contrast = config.contrast === undefined ? 1 : config.contrast;
 		contrast_slider.value = config.contrast = contrast;
 		contrast_value.textContent = contrast.toFixed(2);
+
+		drop_frames.checked = config.drop_frames || true;
+		ntc_url.value = config.ntc_url || '';
 
 		updateImageCorrection();
 
