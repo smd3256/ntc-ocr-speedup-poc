@@ -2329,7 +2329,7 @@ let timer = stdTimer;
 		contrast_value.textContent = contrast.toFixed(2);
 
 		drop_frames.checked = config.drop_frames || true;
-		ntc_url.value = config.ntc_url || "";
+		ntc_url.value = config.ntc_url || '';
 
 		updateImageCorrection();
 
