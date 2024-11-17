@@ -280,7 +280,7 @@ export class WebGL2OCR extends SheetOCRBase {
 			coefs_x[i] = 0;
 			coefs_y[i] = 0;
 		}
-		for (const [_, task] of Object.entries(this.config.tasks)) {
+		for (const [_, task] of Object.entries(this.all_tasks)) {
 			const [x0, y0, width, height] = task.sheet_coordinates;
 			const [sx0, sy0, swidth, sheight] = task.crop;
 			const yscale = height / sheight;

@@ -34,6 +34,7 @@ export class SheetOCRBase {
 		};
 
 		const all_tasks = { ...this.config.tasks };
+		this.all_tasks = all_tasks;
 
 		if (!this.config.tasks.instant_das) {
 			const field_crop = this.config.tasks.field.crop;

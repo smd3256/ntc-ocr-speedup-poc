@@ -91,7 +91,7 @@ export class CPUOCR extends SheetOCRBase {
 			this.sheet_canvas.width,
 			this.sheet_canvas.height
 		);
-		for (const [_, task] of Object.entries(this.config.tasks)) {
+		for (const [_, task] of Object.entries(this.all_tasks)) {
 			// crop
 			const crop_img = crop(frame_pixels, ...task.crop);
 			// scale
