@@ -125,6 +125,7 @@ const tabsContainer = document.querySelector('#tabs'),
 	video = document.querySelector('#device_video'),
 	frame_data = document.querySelector('#frame_data'),
 	perf_data = document.querySelector('#perf_data'),
+	status_ocr_impl = document.querySelector('#ocr_impl'),
 	status_device_name = document.querySelector('#status_device_name'),
 	status_resolution_fps = document.querySelector('#status_resolution_fps'),
 	status_dropped_frames = document.querySelector('#status_dropped_frames'),
@@ -1919,6 +1920,19 @@ function trackAndSendFrames() {
 	if (show_parts.checked) {
 		showConfigControls(templates, palettes, config);
 	}
+
+	switch (QueryString.get('impl')) {
+		case 'cpu':
+			config.ocr_impl = 'cpu';
+			break;
+		case 'gpu':
+			config.ocr_impl = 'gpu';
+			break;
+		default:
+			config.ocr_impl = 'original';
+	}
+	status_ocr_impl.textContent = config.ocr_impl;
+	config.ocr_show_sheet = QueryString.get('show_sheet') === '1';
 
 	game_tracker = new GameTracker(templates, palettes, config);
 

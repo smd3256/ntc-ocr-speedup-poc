@@ -100,14 +100,16 @@ export class WebGL2OCR extends SheetOCRBase {
 	// 3. Run the OCR using scaled images. Impl is the same as the original.
 	constructor(templates, palettes, config) {
 		super(templates, palettes, config);
-
+	}
+	initWebGL2() {
+		if (this.webgl2_initialized) return;
+		this.webgl2_initialized = true;
 		this.image_freelist = [];
 		this.ppb_freelist = [];
 
 		this.canvas = document.createElement('canvas');
 		this.canvas.width = 1;
 		this.canvas.height = 1;
-		//document.body.appendChild(this.canvas);
 
 		this.gl = this.canvas.getContext('webgl2', {
 			desynchronized: true,
@@ -229,9 +231,16 @@ export class WebGL2OCR extends SheetOCRBase {
 	setConfig(config) {
 		super.setConfig(config);
 		this.pending_capture_reinit = true;
+		this.initWebGL2();
+		if (config.ocr_show_sheet) {
+			try {
+				document.body.removeChild(this.canvas);
+			} catch {}
+			document.body.appendChild(this.canvas);
+		}
 		this.updateFilters();
 	}
-	reinitWebGL2(frame) {
+	reconfigureWebGL2(frame) {
 		if (!this.gl) return;
 		// FIXME: skip reinit when sizes are not changed
 		this.image_freelist = [];
@@ -523,7 +532,7 @@ export class WebGL2OCR extends SheetOCRBase {
 	async processFrameStep1(frame) {
 		// Buffer 1 frame in order to overlap cpu/gpu tasks
 		if (!this.gl || this.pending_capture_reinit) {
-			this.reinitWebGL2(frame);
+			this.reconfigureWebGL2(frame);
 		}
 		// Update texture
 		this.gl.activeTexture(this.gl.TEXTURE0);
