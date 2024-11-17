@@ -72,16 +72,28 @@ export const GYM_PAUSE_LUMA_THRESHOLD = 75;
 
 export default class TetrisOCR {
 	constructor(templates, palettes, config) {
-		this.ocr_impl = new cpuTetrisOCRImpl(templates, palettes, config);
+		switch (config.ocr_impl) {
+			case 'original':
+				this.impl = new originalTetrisOCRImpl(templates, palettes, config);
+				break;
+			case 'cpu':
+				this.impl = new CPUOCR(templates, palettes, config);
+				break;
+			case 'gpu':
+				this.impl = new WebGL2OCR(templates, palettes, config);
+				break;
+			default:
+				throw new Error('Invalid OCR implementation');
+		}
 	}
 	setConfig(config) {
-		this.ocr_impl.setConfig(config);
+		this.impl.setConfig(config);
 	}
 	async processFrameStep1(frame) {
-		return this.ocr_impl.processFrameStep1(frame);
+		return this.impl.processFrameStep1(frame);
 	}
 	async processFrameStep2(partial_frame, level) {
-		return this.ocr_impl.processFrameStep2(partial_frame, level);
+		return this.impl.processFrameStep2(partial_frame, level);
 	}
 }
 
