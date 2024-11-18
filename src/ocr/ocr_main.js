@@ -84,6 +84,10 @@ const configs = {
 	},
 };
 
+const config_qs = QueryString.get('config');
+const config_key =
+	config_qs && config_qs !== 'config' ? `config_${config_qs}` : 'config';
+
 const send_binary = QueryString.get('binary') !== '0';
 
 const default_frame_rate = 60;
@@ -500,7 +504,7 @@ clear_config.addEventListener('click', evt => {
 			'You are about to remove your current configuration. You will have to recalibrate. Are you sure?'
 		)
 	) {
-		localStorage.removeItem('config');
+		localStorage.removeItem(config_key);
 		location.reload();
 	}
 });
@@ -1803,13 +1807,13 @@ function saveConfig(config) {
 		};
 	}
 
-	localStorage.setItem('config', JSON.stringify(config_copy));
+	localStorage.setItem(config_key, JSON.stringify(config_copy));
 
 	resetShowPartsTimer();
 }
 
 function hasConfig() {
-	const maybeConfig = localStorage.getItem('config');
+	const maybeConfig = localStorage.getItem(config_key);
 	if (!maybeConfig) return false;
 
 	// minimal checks for validity of the config object
@@ -1838,7 +1842,7 @@ function getGameTypeFromTasks(tasks) {
 }
 
 function loadConfig() {
-	const config = localStorage.getItem('config');
+	const config = localStorage.getItem(config_key);
 
 	if (config) {
 		const parsed = JSON.parse(config);
