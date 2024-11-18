@@ -213,6 +213,56 @@
 	</head>
 
 	<body>
+		<div>
+			<fieldset>
+				<legend>About</legend>
+				<p>
+					This is a partial fork of NestrisChamps (<a
+						href="https://github.com/timotheeg/nestrischamps"
+						target="_blank"
+						>https://github.com/timotheeg/nestrischamps</a
+					>) by
+					<a href="https://github.com/smd3256" target="_blank">smd3256</a>. It
+					shows a proof-of-concept of GPU-accelerated OCR.
+				</p>
+				<p>
+					Repository:
+					<a
+						href="https://github.com/smd3256/ntc-ocr-speedup-poc"
+						target="_blank"
+						>https://github.com/smd3256/ntc-ocr-speedup-poc</a
+					>
+				</p>
+				<p>
+					Tested under stable Chrome on Windows 11. Other browsers/OSes might
+					work, although not tested.
+				</p>
+				<p>Additional query string configurations:</p>
+				<ul style="list-style: disc; padding-left: 30px">
+					<li>
+						impl=[<b>original</b>/cpu/gpu] Select OCR implementation
+						<ul style="list-style: circle; padding-left: 30px">
+							<li>original: NTC original</li>
+							<li>gpu: GPU-accelerated, requires WebGL2</li>
+							<li>
+								cpu: Reference implementation. Same method as gpu, but uses only
+								CPU and canvas
+							</li>
+						</ul>
+					</li>
+					<li>
+						show_sheet=[1/<b>0</b>] Display sprite sheet at the bottom, only
+						effective for gpu/cpu implementation
+					</li>
+					<li>
+						config=[<i>config_name</i>] Specify configuration name, for default
+						leave it blank or set to <b>config</b>. It enables multiple
+						configurations/calibrations.
+					</li>
+				</ul>
+				<p>ABSOLUTELY NO WARRANTY. USE AT YOUR OWN RISK!</p>
+			</fieldset>
+		</div>
 		<canvas id="video_capture"></canvas>
 		<div class="notice is-hidden"></div>
 
