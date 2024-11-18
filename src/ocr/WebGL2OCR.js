@@ -497,7 +497,7 @@ export class WebGL2OCR extends SheetOCRBase {
 		return new Promise(resolve => {
 			const checkSync = () => {
 				if (gl.clientWaitSync(sync, 0, 0) === gl.TIMEOUT_EXPIRED) {
-					if (scheduler.postTask) {
+					if (scheduler && scheduler.postTask) {
 						// chrome only
 						scheduler.postTask(checkSync);
 					} else if (requestIdleCallback) {
