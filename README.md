@@ -17,6 +17,12 @@ Some behaviors can be configured from the following query string:
 
 # Local dev
 
+## Install dependencies
+
+```
+npm install
+```
+
 ## Run server
 
 ```
