@@ -496,16 +496,25 @@ export class WebGL2OCR extends SheetOCRBase {
 		// Schedule data retrieval
 		return new Promise(resolve => {
 			const checkSync = () => {
-				if (gl.clientWaitSync(sync, 0, 0) === gl.TIMEOUT_EXPIRED) {
-					if (scheduler && scheduler.postTask) {
+				if (
+					gl.clientWaitSync(sync, gl.SYNC_FLUSH_COMMANDS_BIT, 0) ===
+					gl.TIMEOUT_EXPIRED
+				) {
+					if (window.scheduler && window.scheduler.postTask) {
 						// chrome only
-						scheduler.postTask(checkSync);
-					} else if (requestIdleCallback) {
-						// chrome/firefox only
-						requestIdleCallback(checkSync, { timeout: 1 });
+						window.scheduler.postTask(checkSync);
+					} else if (window.MessageChannel) {
+						if (!this.mc) {
+							this.mc = new window.MessageChannel();
+						}
+						this.mc.port2.addEventListener('message', checkSync, {
+							once: true,
+						});
+						this.mc.port2.start();
+						this.mc.port1.postMessage('message');
 					} else {
-						// other, needs focus
-						setTimeout(checkSync, 0);
+						// last resort, need focus
+						window.setTimeout(checkSync, 0);
 					}
 					return;
 				}
@@ -553,16 +562,16 @@ export class WebGL2OCR extends SheetOCRBase {
 		this.gl.useProgram(this.sheetProgInfo.program);
 		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
-		// Schedule frame buffer grab
-		let prom = this.getImageDataAsync();
 		// Get previous image data
 		if (this.last_frame_images_promise) {
 			const [source_img, sheet_img] = await this.last_frame_images_promise;
-			this.last_frame_images_promise = prom;
 			this.config.source_img = source_img;
+			// Schedule frame buffer grab
+			this.last_frame_images_promise = this.getImageDataAsync();
 			return this.processFrameStep1_ocr(source_img, sheet_img);
 		}
-		this.last_frame_images_promise = prom;
+		// Schedule frame buffer grab
+		this.last_frame_images_promise = this.getImageDataAsync();
 		return null;
 	}
 	async processFrameStep2(partial_frame, level) {
