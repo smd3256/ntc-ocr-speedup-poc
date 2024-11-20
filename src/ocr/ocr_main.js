@@ -1932,6 +1932,9 @@ function trackAndSendFrames() {
 		case 'gpu':
 			config.ocr_impl = 'gpu';
 			break;
+		case 'gpu_sync':
+			config.ocr_impl = 'gpu_sync';
+			break;
 		default:
 			config.ocr_impl = 'original';
 	}
