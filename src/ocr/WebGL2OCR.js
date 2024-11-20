@@ -98,8 +98,9 @@ export class WebGL2OCR extends SheetOCRBase {
 	// 1. Crop, scale, and pack into a single image (something like sprite sheet) using GPU.
 	// 2. Retrieve the image asynchronously (for overlapping other tasks).
 	// 3. Run the OCR using scaled images. Impl is the same as the original.
-	constructor(templates, palettes, config) {
+	constructor(templates, palettes, config, sync) {
 		super(templates, palettes, config);
+		this.sync_readback = !!sync;
 	}
 	initWebGL2() {
 		if (this.webgl2_initialized) return;
@@ -447,6 +448,38 @@ export class WebGL2OCR extends SheetOCRBase {
 			this.gl.uniform1f(this.filterProgInfo.u.u_intercept, intercept);
 		}
 	}
+	getImageDataSync() {
+		const [source_w, source_h, sheet_w, sheet_h] = [
+			this.config.capture_area.w,
+			this.config.capture_area.h,
+			this.canvas.width,
+			this.canvas.height,
+		];
+		const [source_img, sheet_img] = this.getImageData();
+		this.gl.readPixels(
+			0,
+			0,
+			sheet_w,
+			sheet_h,
+			this.gl.RGBA,
+			this.gl.UNSIGNED_BYTE,
+			sheet_img.data
+		);
+		if (show_parts) {
+			this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.source_fbo);
+			this.gl.readPixels(
+				this.config.capture_area.x,
+				this.config.capture_area.y,
+				source_w,
+				source_h,
+				this.gl.RGBA,
+				this.gl.UNSIGNED_BYTE,
+				source_img.data
+			);
+		}
+		this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+		return [source_img, sheet_img];
+	}
 	getImageDataAsync() {
 		if (!this.gl) return;
 		const t0 = performance.now();
@@ -562,17 +595,25 @@ export class WebGL2OCR extends SheetOCRBase {
 		this.gl.useProgram(this.sheetProgInfo.program);
 		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
-		// Get previous image data
-		if (this.last_frame_images_promise) {
-			const [source_img, sheet_img] = await this.last_frame_images_promise;
+		if (this.sync_readback) {
+			// Sync
+			const [source_img, sheet_img] = this.getImageDataSync();
 			this.config.source_img = source_img;
+			return this.processFrameStep1_ocr(source_img, sheet_img);
+		} else {
+			// Async
+			// Get previous image data
+			if (this.last_frame_images_promise) {
+				const [source_img, sheet_img] = await this.last_frame_images_promise;
+				this.config.source_img = source_img;
+				// Schedule frame buffer grab
+				this.last_frame_images_promise = this.getImageDataAsync();
+				return this.processFrameStep1_ocr(source_img, sheet_img);
+			}
 			// Schedule frame buffer grab
 			this.last_frame_images_promise = this.getImageDataAsync();
-			return this.processFrameStep1_ocr(source_img, sheet_img);
+			return null;
 		}
-		// Schedule frame buffer grab
-		this.last_frame_images_promise = this.getImageDataAsync();
-		return null;
 	}
 	async processFrameStep2(partial_frame, level) {
 		const result = super.processFrameStep2(partial_frame, level);

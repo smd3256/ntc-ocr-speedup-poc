@@ -82,6 +82,9 @@ export default class TetrisOCR {
 			case 'gpu':
 				this.impl = new WebGL2OCR(templates, palettes, config);
 				break;
+			case 'gpu_sync':
+				this.impl = new WebGL2OCR(templates, palettes, config, true);
+				break;
 			default:
 				throw new Error('Invalid OCR implementation');
 		}
