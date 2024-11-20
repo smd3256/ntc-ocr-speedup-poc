@@ -2349,7 +2349,7 @@ let timer = stdTimer;
 		contrast_slider.value = config.contrast = contrast;
 		contrast_value.textContent = contrast.toFixed(2);
 
-		drop_frames.checked = config.drop_frames || true;
+		drop_frames.checked = config.drop_frames != false;
 		ntc_url.value = config.ntc_url || '';
 
 		updateImageCorrection();
