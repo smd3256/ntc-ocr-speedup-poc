@@ -428,7 +428,11 @@
 
 					<div>
 						<label for="show_parts">Show Parts</label>
-						<input type="checkbox" id="show_parts" checked />
+						<!--
+							Firefox preserves input states upon reload by default, autocomplete="off" prevents this behavior
+							see https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete
+						-->
+						<input type="checkbox" id="show_parts" checked autocomplete="off" />
 					</div>
 
 					<div
