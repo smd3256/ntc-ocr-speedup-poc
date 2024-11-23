@@ -86,7 +86,7 @@ const configs = {
 
 const config_qs = QueryString.get('config');
 const config_key =
-	config_qs && config_qs !== 'config' ? `config_${config_qs}` : 'config';
+	config_qs && config_qs !== 'default' ? `config_${config_qs}` : 'default';
 
 const send_binary = QueryString.get('binary') !== '0';
 
