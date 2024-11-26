@@ -130,6 +130,7 @@ const tabsContainer = document.querySelector('#tabs'),
 	ref_image = document.querySelector('#ref_image'),
 	frame_data = document.querySelector('#frame_data'),
 	perf_data = document.querySelector('#perf_data'),
+	perf_warn = document.querySelector('#perf_warn'),
 	status_ocr_impl = document.querySelector('#ocr_impl'),
 	status_device_name = document.querySelector('#status_device_name'),
 	status_resolution_fps = document.querySelector('#status_resolution_fps'),
@@ -663,6 +664,7 @@ async function doCalibration(evt, elem, width, height) {
 
 	saveConfig(config);
 	config.show_parts = true;
+	perf_warn.classList.remove('is-hidden');
 	trackAndSendFrames();
 
 	if (
@@ -705,7 +707,10 @@ function onShowPartsChanged() {
 	}
 
 	if (show_parts.checked) {
+		perf_warn.classList.remove('is-hidden');
 		resetShowPartsTimer();
+	} else {
+		perf_warn.classList.add('is-hidden');
 	}
 }
 
@@ -2387,6 +2392,7 @@ let timer = stdTimer;
 	if (hasConfig()) {
 		config = loadConfig();
 		config.show_parts = true;
+		perf_warn.classList.remove('is-hidden');
 
 		// transformation of color numbers for old configs
 		// TODO: delete when everyone is using the new config
