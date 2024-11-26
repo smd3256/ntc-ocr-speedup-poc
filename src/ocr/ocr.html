@@ -64,6 +64,11 @@
 				width: 360px;
 			}
 
+			img#ref_image {
+				/* display: none; */
+				width: 360px;
+			}
+
 			video#video_feed {
 				margin-top: 0.5em;
 			}
@@ -417,6 +422,10 @@
 					</fieldset>
 					<fieldset>
 						<legend>OCR Performance (in ms)</legend>
+						<div id="perf_warn" class="is-hidden">
+							Warning: Calibration UI is visible. Performance measurement may be
+							inaccurate
+						</div>
 						<dl id="perf_data"></dl>
 					</fieldset>
 				</div>
@@ -476,6 +485,7 @@
 					<div id="capture-container">
 						<div id="capture">
 							<video id="device_video" playsinline controls="false"></video>
+							<img id="ref_image" class="is-hidden" />
 						</div>
 					</div>
 					<div id="adjustments"></div>
