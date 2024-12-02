@@ -114,6 +114,7 @@ export class WebGL2OCR extends SheetOCRBase {
 
 		this.gl = this.canvas.getContext('webgl2', {
 			desynchronized: true,
+			preserveDrawingBuffer: true,
 		});
 		if (!this.gl) {
 			console.error('WebGL2 not supported');
@@ -480,9 +481,8 @@ export class WebGL2OCR extends SheetOCRBase {
 		this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
 		return [source_img, sheet_img];
 	}
-	getImageDataAsync() {
+	requestGetImageDataAsync() {
 		if (!this.gl) return;
-		const t0 = performance.now();
 		// read sheet
 		const ppb = this.getPPB();
 		const [source_w, source_h, sheet_w, sheet_h] = [
@@ -524,9 +524,9 @@ export class WebGL2OCR extends SheetOCRBase {
 		this.gl.bindBuffer(this.gl.PIXEL_PACK_BUFFER, null);
 		// Create sync object
 		const sync = this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-		this.gl.flush();
-		const gl = this.gl; // bind
-		// Schedule data retrieval
+		return { gl: this.gl, ppb, sync, show_parts };
+	}
+	finishGetImageDataAsync({ gl, ppb, sync, show_parts }) {
 		return new Promise(resolve => {
 			const checkSync = () => {
 				if (
@@ -565,16 +565,29 @@ export class WebGL2OCR extends SheetOCRBase {
 				// reuse
 				this.freePPB(ppb);
 				resolve([source_img, sheet_img]);
-				performance.measure('gpu', { start: t0 });
 			};
 			checkSync();
 		});
 	}
+
 	async processFrameStep1(frame) {
 		// Buffer 1 frame in order to overlap cpu/gpu tasks
 		if (!this.gl || this.pending_capture_reinit) {
 			this.reconfigureWebGL2(frame);
 		}
+		let source_img, sheet_img;
+		// Read rendering result of last frame
+		if (this.sync_readback) {
+			[source_img, sheet_img] = this.getImageDataSync();
+			this.config.source_img = source_img;
+		} else if (this.read_context) {
+			[source_img, sheet_img] = await this.finishGetImageDataAsync(
+				this.read_context
+			);
+			this.read_context = null;
+			this.config.source_img = source_img;
+		}
+		// TODO: start measurement
 		// Update texture
 		this.gl.activeTexture(this.gl.TEXTURE0);
 		this.gl.texImage2D(
@@ -595,25 +608,15 @@ export class WebGL2OCR extends SheetOCRBase {
 		this.gl.useProgram(this.sheetProgInfo.program);
 		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
-		if (this.sync_readback) {
-			// Sync
-			const [source_img, sheet_img] = this.getImageDataSync();
-			this.config.source_img = source_img;
-			return this.processFrameStep1_ocr(source_img, sheet_img);
-		} else {
-			// Async
-			// Get previous image data
-			if (this.last_frame_images_promise) {
-				const [source_img, sheet_img] = await this.last_frame_images_promise;
-				this.config.source_img = source_img;
-				// Schedule frame buffer grab
-				this.last_frame_images_promise = this.getImageDataAsync();
-				return this.processFrameStep1_ocr(source_img, sheet_img);
-			}
-			// Schedule frame buffer grab
-			this.last_frame_images_promise = this.getImageDataAsync();
-			return null;
+		if (!this.sync_readback) {
+			this.read_context = this.requestGetImageDataAsync();
 		}
+		// TODO: finish measurement
+		this.gl.flush();
+		if (source_img && sheet_img) {
+			return this.processFrameStep1_ocr(source_img, sheet_img);
+		}
+		return null;
 	}
 	async processFrameStep2(partial_frame, level) {
 		const result = super.processFrameStep2(partial_frame, level);
