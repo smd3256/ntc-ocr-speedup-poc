@@ -129,6 +129,7 @@ const tabsContainer = document.querySelector('#tabs'),
 	video = document.querySelector('#device_video'),
 	ref_image = document.querySelector('#ref_image'),
 	frame_data = document.querySelector('#frame_data'),
+	show_frame_data = document.querySelector('#show_frame_data'),
 	perf_data = document.querySelector('#perf_data'),
 	perf_warn = document.querySelector('#perf_warn'),
 	status_ocr_impl = document.querySelector('#ocr_impl'),
@@ -1458,7 +1459,6 @@ async function captureFrame() {
 	if (capture_running && drop_frames.checked) {
 		dropped_frames_count++;
 		performance.mark('framedrop');
-		status_dropped_frames.textContent = dropped_frames_count;
 		return;
 	}
 	capture_running = true;
@@ -1939,6 +1939,11 @@ function loadConfig() {
 function showFrameData(data) {
 	if (!data) return;
 
+	if (!show_frame_data.checked) {
+		frame_data.innerHTML = '';
+		return;
+	}
+
 	// FIXME: remove extra dt/dds if entries change frequently (is it possible?)
 
 	for (const [name, value] of Object.entries(data)) {
@@ -2100,6 +2105,8 @@ function trackAndSendFrames() {
 					performance.getEntriesByName('show_perf_data')[0].duration / perfCount
 				).toFixed(3),
 			});
+
+			status_dropped_frames.textContent = dropped_frames_count;
 
 			perfSumData = {};
 			perfCount = 0;
