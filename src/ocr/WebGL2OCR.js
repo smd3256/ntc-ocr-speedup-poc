@@ -1,4 +1,5 @@
 import { SheetOCRBase } from '/ocr/SheetOCRBase.js';
+import { getVideoFrameSize } from '/ocr/utils.js';
 import {
 	initTextures,
 	initRG32FTexture,
@@ -256,9 +257,10 @@ export class WebGL2OCR extends SheetOCRBase {
 		[this.canvas.width, this.canvas.height] = this.config.sheet_size;
 		this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
+		const [fw, fh] = getVideoFrameSize(frame);
 		[this.frame_width, this.frame_height] = [
-			frame.width,
-			frame.height >> (this.config.use_half_height ? 1 : 0),
+			fw,
+			fh >> (this.config.use_half_height ? 1 : 0),
 		];
 
 		// init texture data

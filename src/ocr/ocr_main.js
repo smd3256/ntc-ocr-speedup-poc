@@ -90,6 +90,8 @@ const config_key =
 
 const send_binary = QueryString.get('binary') !== '0';
 
+const direct_tex2img = QueryString.get('direct') !== '0';
+
 const default_frame_rate = 60;
 
 const is_match_room = /^\/room\/u\//.test(new URL(location).pathname);
@@ -1446,13 +1448,17 @@ async function captureFrame() {
 
 		performance.mark('capture_start');
 		if (video.videoWidth && video.videoHeight) {
-			bitmap = await createImageBitmap(
-				video,
-				0,
-				0,
-				video.videoWidth,
-				video.videoHeight
-			);
+			if (direct_tex2img) {
+				bitmap = video;
+			} else {
+				bitmap = await createImageBitmap(
+					video,
+					0,
+					0,
+					video.videoWidth,
+					video.videoHeight
+				);
+			}
 		}
 		performance.mark('capture_end');
 

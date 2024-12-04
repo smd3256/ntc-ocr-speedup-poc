@@ -1,5 +1,6 @@
 import { SheetOCRBase } from '/ocr/SheetOCRBase.js';
 import { bicubic, crop } from '/ocr/image_tools.js';
+import { getVideoFrameSize } from '/ocr/utils.js';
 
 export class CPUOCR extends SheetOCRBase {
 	// CPU-based OCR as a reference implementation
@@ -36,9 +37,9 @@ export class CPUOCR extends SheetOCRBase {
 		this.pending_capture_reinit = false;
 		// Canvas for frame
 		this.frame_canvas = document.createElement('canvas');
-		this.frame_canvas.width = frame.width;
-		this.frame_canvas.height =
-			frame.height >> (this.config.use_half_height ? 1 : 0);
+		const [fw, fh] = getVideoFrameSize(frame);
+		this.frame_canvas.width = fw;
+		this.frame_canvas.height = fh >> (this.config.use_half_height ? 1 : 0);
 		this.frame_canvas_ctx = this.frame_canvas.getContext('2d', {
 			alpha: false,
 			willReadFrequently: true,
