@@ -127,7 +127,6 @@ const tabsContainer = document.querySelector('#tabs'),
 	timer_control = document.querySelector('#timer_control'),
 	start_timer = document.querySelector('#start_timer'),
 	video = document.querySelector('#device_video'),
-	ref_image = document.querySelector('#ref_image'),
 	frame_data = document.querySelector('#frame_data'),
 	show_frame_data = document.querySelector('#show_frame_data'),
 	perf_data = document.querySelector('#perf_data'),
@@ -535,21 +534,7 @@ start_timer.addEventListener('click', evt => {
 
 video.controls = false;
 video.style.cursor = 'crosshair';
-ref_image.style.cursor = 'crosshair';
-
-video.addEventListener('click', evt => {
-	doCalibration(evt, video, video.videoWidth, video.videoHeight);
-});
-ref_image.addEventListener('click', evt => {
-	doCalibration(
-		evt,
-		ref_image,
-		ref_image.naturalWidth,
-		ref_image.naturalHeight
-	);
-});
-
-async function doCalibration(evt, elem, width, height) {
+video.addEventListener('click', async evt => {
 	evt.preventDefault();
 	if (!pending_calibration || in_calibration) return;
 
@@ -557,12 +542,12 @@ async function doCalibration(evt, elem, width, height) {
 	// pending_calibration = false;
 	// in_calibration = true;
 
-	const styles = getComputedStyle(elem);
-	const ratioX = evt.offsetX / css_size(styles.width);
-	const ratioY = evt.offsetY / css_size(styles.height);
+	const video_styles = getComputedStyle(video);
+	const ratioX = evt.offsetX / css_size(video_styles.width);
+	const ratioY = evt.offsetY / css_size(video_styles.height);
 	const floodStartPoint = [
-		Math.round(width * ratioX),
-		Math.round(height * ratioY),
+		Math.round(video.videoWidth * ratioX),
+		Math.round(video.videoHeight * ratioY),
 	];
 
 	device_selector.disabled = true;
@@ -572,14 +557,17 @@ async function doCalibration(evt, elem, width, height) {
 	const rom_config = configs[rom_selector.value];
 
 	const video_capture_ctx = video_capture.getContext('2d', { alpha: false });
-	const bitmap = await createImageBitmap(elem, 0, 0, width, height);
+	const bitmap = await createImageBitmap(
+		video,
+		0,
+		0,
+		video.videoWidth,
+		video.videoHeight
+	);
 
-	updateCanvasSizeIfNeeded(video_capture, width, height);
+	updateCanvasSizeIfNeeded(video_capture, video.videoWidth, video.videoHeight);
 
-	if (
-		elem instanceof HTMLImageElement ||
-		(elem instanceof HTMLVideoElement && elem.ntcType === 'device')
-	) {
+	if (video.ntcType === 'device') {
 		video_capture_ctx.filter = 'brightness(1.75) contrast(1.75)';
 	} else {
 		video_capture_ctx.filter = 'contrast(1.5)';
@@ -590,7 +578,12 @@ async function doCalibration(evt, elem, width, height) {
 		setTimeout(resolve, 0); // wait one tick for everything to be drawn nicely... just in case
 	});
 
-	const img_data = video_capture_ctx.getImageData(0, 0, width, height);
+	const img_data = video_capture_ctx.getImageData(
+		0,
+		0,
+		video.videoWidth,
+		video.videoHeight
+	);
 
 	// Get field coordinates via flood-fill (includes borders on all sides)
 	// Question: instead of targetting black, should we just take the selected color as reference?
@@ -628,8 +621,8 @@ async function doCalibration(evt, elem, width, height) {
 		console.log('Unable to match template');
 		ox = 0;
 		oy = 0;
-		ow = width;
-		oh = height;
+		ow = video.videoWidth;
+		oh = video.videoHeight;
 	} else {
 		console.log('Found offsets!');
 	}
@@ -668,18 +661,13 @@ async function doCalibration(evt, elem, width, height) {
 	perf_warn.classList.remove('is-hidden');
 	trackAndSendFrames();
 
-	if (
-		elem instanceof HTMLImageElement ||
-		(elem instanceof HTMLVideoElement && elem.ntcType === 'device')
-	) {
+	if (video.ntcType === 'device') {
 		brightness_slider.value = 1.75;
 		onBrightnessChange();
 	}
 
 	video.style.cursor = null;
-	ref_image.style.cursor = null;
 	capture.prepend(video);
-	capture.prepend(ref_image);
 	tabs[2].click(); // calibration
 	showProducerUI();
 
@@ -688,7 +676,7 @@ async function doCalibration(evt, elem, width, height) {
 			'Rough calibration has been completed 🎉!\n\nYou now MUST inspect and fine tune all the fields (location and size) to make them pixel perfect!'
 		);
 	}, 100); // sad (and gross) delay
-}
+});
 
 function onShowPartsChanged() {
 	const display = show_parts.checked ? 'block' : 'none';
@@ -908,12 +896,9 @@ function updateImageCorrection() {
 
 	if (filters.length) {
 		video.style.filter = filters.join(' ');
-		ref_image.style.filter = filters.join(' ');
 	} else {
 		video.style.filter = null;
-		ref_image.style.filter = null;
 		delete video.style.filter;
-		delete ref_image.style.filter;
 	}
 
 	if (game_tracker) {
@@ -1258,39 +1243,32 @@ async function playVideoFromScreenCap(fps) {
 	}
 }
 
+async function playVideoFromRef(device_id, fps) {
+	const src =
+		device_id === 'ref-das'
+			? 'sample_captures/das_trainer_1.mp4'
+			: 'sample_captures/classic_1.mp4';
+	status_device_name.textContent = 'Reference Picture';
+
+	video.loop = true;
+	video.muted = true;
+	video.src = src;
+	await video.play();
+}
+
 async function playVideoFromConfig() {
 	if (!config.device_id) {
 		return;
 	}
 
-	if (config.device_id.startsWith('ref-')) {
-		video.classList.add('is-hidden');
-		ref_image.classList.remove('is-hidden');
-		const img =
-			config.device_id === 'ref-das'
-				? 'sample_captures/das_trainer_1.png'
-				: 'sample_captures/classic_1.png';
-		// Load and wait
-		await new Promise(resolve => {
-			ref_image.addEventListener(
-				'load',
-				() => {
-					resolve();
-				},
-				{ once: true }
-			);
-			ref_image.src = img;
-		});
-		status_device_name.textContent = 'Reference Image';
-	} else {
-		video.classList.remove('is-hidden');
-		ref_image.classList.add('is-hidden');
+	video.classList.remove('is-hidden');
 
-		if (config.device_id === 'window') {
-			await playVideoFromScreenCap(config.frame_rate);
-		} else {
-			await playVideoFromDevice(config.device_id, config.frame_rate);
-		}
+	if (config.device_id === 'window') {
+		await playVideoFromScreenCap(config.frame_rate);
+	} else if (config.device_id.startsWith('ref-')) {
+		await playVideoFromRef(config.device_id, config.frame_rate);
+	} else {
+		await playVideoFromDevice(config.device_id, config.frame_rate);
 	}
 
 	capture_rate
@@ -1318,15 +1296,14 @@ async function updateFrameRate() {
 
 function stopCapture() {
 	timer.clearInterval(capture_process);
-	ref_image_bitmap = null;
 }
 
 async function startCapture(stream) {
 	stopCapture();
 
 	if (config.device_id.startsWith('ref-')) {
-		status_resolution_fps.textContent = `${ref_image.naturalWidth}x${
-			ref_image.naturalHeight
+		status_resolution_fps.textContent = `${video.videoWidth}x${
+			video.videoHeight
 		} ${config.frame_rate.toFixed(1)}fps`;
 
 		const frame_ms = 1000 / config.frame_rate;
@@ -1435,8 +1412,6 @@ function stopUnfocusedAlarm() {
 let capture_running = false;
 let dropped_frames_count = 0;
 
-let ref_image_bitmap;
-
 async function captureFrame() {
 	++frame_count;
 
@@ -1470,22 +1445,7 @@ async function captureFrame() {
 		// which is equivalent to deinterlacing *cough*
 
 		performance.mark('capture_start');
-		if (
-			config.device_id.startsWith('ref-') &&
-			ref_image.naturalWidth &&
-			ref_image.naturalHeight
-		) {
-			if (!ref_image_bitmap) {
-				ref_image_bitmap = await createImageBitmap(
-					ref_image,
-					0,
-					0,
-					ref_image.naturalWidth,
-					ref_image.naturalHeight
-				);
-			}
-			bitmap = ref_image_bitmap;
-		} else if (video.videoWidth && video.videoHeight) {
+		if (video.videoWidth && video.videoHeight) {
 			bitmap = await createImageBitmap(
 				video,
 				0,
@@ -2471,9 +2431,7 @@ let timer = stdTimer;
 		};
 
 		video.classList.add('is-hidden');
-		ref_image.classList.add('is-hidden');
 		wizard.append(video);
-		wizard.append(ref_image);
 		wizard.classList.remove('is-hidden');
 
 		// TODO: await completion of the calibration before connecting
