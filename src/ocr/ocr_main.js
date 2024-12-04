@@ -2042,15 +2042,18 @@ function trackAndSendFrames() {
 		} catch (err) {}
 
 		performance.getEntriesByType('measure').forEach(m => {
-			perfSumData[m.name] = (perfSumData[m.name] || 0) + m.duration;
+			perfSumData[m.name] = {
+				sum: (perfSumData[m.name]?.sum || 0) + m.duration,
+				cnt: (perfSumData[m.name]?.cnt || 0) + 1,
+			};
 		});
 		perfCount++;
 
 		if (!lastPerfDisplay || Date.now() - lastPerfDisplay >= 1000) {
 			const perf = {};
 
-			for (const [name, duration] of Object.entries(perfSumData)) {
-				perf[name] = (duration / perfCount).toFixed(3);
+			for (const [name, stat] of Object.entries(perfSumData)) {
+				perf[name] = (stat.sum / stat.cnt).toFixed(3);
 			}
 
 			if (!show_parts.checked) {
