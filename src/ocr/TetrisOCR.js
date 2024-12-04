@@ -1,6 +1,7 @@
 import { timingDecorator } from '/ocr/utils.js';
 import { bicubic, crop, luma } from '/ocr/image_tools.js';
 import { rgb2lab } from '/ocr/utils.js';
+import { getVideoFrameSize } from '/ocr/utils.js';
 
 import { WebGL2OCR } from '/ocr/WebGL2OCR.js';
 import { CPUOCR, ComparingOCR } from '/ocr/CPUOCR.js';
@@ -286,9 +287,9 @@ export class originalTetrisOCRImpl {
 		this.pending_capture_reinit = false;
 		this.capture_canvas = document.createElement('canvas');
 
-		this.capture_canvas.width = frame.width;
-		this.capture_canvas.height =
-			frame.height >> (this.config.use_half_height ? 1 : 0);
+		const [fw, fh] = getVideoFrameSize(frame);
+		this.capture_canvas.width = fw;
+		this.capture_canvas.height = fh >> (this.config.use_half_height ? 1 : 0);
 
 		this.capture_canvas_ctx = this.capture_canvas.getContext('2d', {
 			alpha: false,
@@ -321,12 +322,13 @@ export class originalTetrisOCRImpl {
 		}
 
 		performance.mark('start');
+		const [fw, fh] = getVideoFrameSize(frame);
 		this.capture_canvas_ctx.drawImage(
 			frame,
 			0,
 			0,
-			frame.width,
-			frame.height >> (this.config.use_half_height ? 1 : 0)
+			fw,
+			fh >> (this.config.use_half_height ? 1 : 0)
 		);
 		performance.mark('draw_end');
 		performance.measure('draw_frame', 'start', 'draw_end');

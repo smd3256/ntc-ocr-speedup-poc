@@ -49,3 +49,15 @@ export function rgb2lab([r, g, b]) {
 		200 * (Y - Z), // b
 	];
 }
+
+export function getVideoFrameSize(frame) {
+	if (frame instanceof HTMLVideoElement) {
+		return [frame.videoWidth, frame.videoHeight];
+	} else if (frame instanceof HTMLImageElement) {
+		return [frame.naturalWidth, frame.naturalHeight];
+	} else if (frame instanceof ImageBitmap) {
+		return [frame.width, frame.height];
+	} else {
+		return [0, 0];
+	}
+}
