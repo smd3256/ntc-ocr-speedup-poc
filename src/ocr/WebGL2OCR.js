@@ -616,12 +616,17 @@ export class WebGL2OCR extends SheetOCRBase {
 		// TODO: finish measurement
 		this.gl.flush();
 		if (source_img && sheet_img) {
-			return this.processFrameStep1_ocr(source_img, sheet_img);
+			performance.mark('cpu_step1_start');
+			const result = this.processFrameStep1_ocr(source_img, sheet_img);
+			performance.measure('cpu_step1', 'cpu_step1_start');
+			return result;
 		}
 		return null;
 	}
 	async processFrameStep2(partial_frame, level) {
+		performance.mark('cpu_step2_start');
 		const result = super.processFrameStep2(partial_frame, level);
+		performance.measure('cpu_step2', 'cpu_step2_start');
 		const [source_img, sheet_img] = [
 			partial_frame.source_img,
 			partial_frame.sheet_img,
