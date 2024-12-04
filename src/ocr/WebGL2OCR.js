@@ -108,6 +108,8 @@ export class WebGL2OCR extends SheetOCRBase {
 		this.webgl2_initialized = true;
 		this.image_freelist = [];
 		this.ppb_freelist = [];
+		this.query_freelist = [];
+		this.query_inprogress = [];
 
 		this.canvas = document.createElement('canvas');
 		this.canvas.width = 1;
@@ -124,6 +126,11 @@ export class WebGL2OCR extends SheetOCRBase {
 
 		// for measurement
 		this.ext = this.gl.getExtension('EXT_disjoint_timer_query_webgl2');
+		if (!this.ext) {
+			console.log(
+				'EXT_disjoint_timer_query_webgl2 not available, unable to measure gpu time'
+			);
+		}
 
 		// create filte shader and related resources
 		this.filterProgInfo = initWegGL2ResourcesFor2D(this.gl, FSforFilter, [
@@ -230,6 +237,48 @@ export class WebGL2OCR extends SheetOCRBase {
 			this.gl.deleteBuffer(ppb.source_ppb);
 			this.gl.deleteBuffer(ppb.sheet_ppb);
 		}
+	}
+	getQuery() {
+		let query = this.query_freelist.pop();
+		if (!query) {
+			query = this.gl.createQuery();
+		}
+		return query;
+	}
+	checkQueryAsync(query) {
+		this.query_inprogress.push(query);
+	}
+	getQueryResults() {
+		if (!this.ext) {
+			return [];
+		}
+		// check disjoint
+		const disjoint = this.gl.getParameter(this.ext.GPU_DISJOINT_EXT);
+		if (disjoint) {
+			this.query_freelist.forEach(q => {
+				this.gl.deleteQuery(q);
+			});
+			this.query_inprogress.forEach(q => {
+				this.gl.deleteQuery(q);
+			});
+			this.query_freelist = [];
+			this.query_inprogress = [];
+			return [];
+		}
+		const results = [];
+		for (let i = 0; i < this.query_inprogress.length; i++) {
+			const q = this.query_inprogress[i];
+			const available = this.gl.getQueryParameter(
+				q,
+				this.gl.QUERY_RESULT_AVAILABLE
+			);
+			if (!available) break;
+			results.push(this.gl.getQueryParameter(q, this.gl.QUERY_RESULT));
+		}
+		for (let i = 0; i < results.length; i++) {
+			this.query_freelist.push(this.query_inprogress.shift());
+		}
+		return results;
 	}
 	setConfig(config) {
 		super.setConfig(config);
@@ -589,7 +638,12 @@ export class WebGL2OCR extends SheetOCRBase {
 			this.read_context = null;
 			this.config.source_img = source_img;
 		}
-		// TODO: start measurement
+		let query;
+		if (this.ext) {
+			// start measurement
+			query = this.getQuery();
+			this.gl.beginQuery(this.ext.TIME_ELAPSED_EXT, query);
+		}
 		// Update texture
 		this.gl.activeTexture(this.gl.TEXTURE0);
 		this.gl.texImage2D(
@@ -613,15 +667,36 @@ export class WebGL2OCR extends SheetOCRBase {
 		if (!this.sync_readback) {
 			this.read_context = this.requestGetImageDataAsync();
 		}
-		// TODO: finish measurement
+		if (this.ext) {
+			// finish measurement
+			this.gl.endQuery(this.ext.TIME_ELAPSED_EXT);
+			this.checkQueryAsync(query);
+		}
 		this.gl.flush();
+
+		if (this.ext) {
+			// get results, only use 1 result for simplicity
+			const results = this.getQueryResults();
+			if (results.length >= 1) {
+				const elapsed_ms = results[0] / 1000000; // ns -> ms
+				performance.measure('gpu_render', {
+					duration: elapsed_ms,
+					end: performance.now(),
+				});
+			}
+		}
 		if (source_img && sheet_img) {
-			return this.processFrameStep1_ocr(source_img, sheet_img);
+			performance.mark('cpu_step1_start');
+			const result = this.processFrameStep1_ocr(source_img, sheet_img);
+			performance.measure('cpu_step1', 'cpu_step1_start');
+			return result;
 		}
 		return null;
 	}
 	async processFrameStep2(partial_frame, level) {
+		performance.mark('cpu_step2_start');
 		const result = super.processFrameStep2(partial_frame, level);
+		performance.measure('cpu_step2', 'cpu_step2_start');
 		const [source_img, sheet_img] = [
 			partial_frame.source_img,
 			partial_frame.sheet_img,
