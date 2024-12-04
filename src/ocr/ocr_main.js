@@ -547,7 +547,7 @@ video.addEventListener('click', async evt => {
 	const ratioY = evt.offsetY / css_size(video_styles.height);
 	const floodStartPoint = [
 		Math.round(video.videoWidth * ratioX),
-		Math.round(video.videoWidth * ratioY),
+		Math.round(video.videoHeight * ratioY),
 	];
 
 	device_selector.disabled = true;
@@ -562,10 +562,10 @@ video.addEventListener('click', async evt => {
 		0,
 		0,
 		video.videoWidth,
-		video.videoWidth
+		video.videoHeight
 	);
 
-	updateCanvasSizeIfNeeded(video_capture, video.videoWidth, video.videoWidth);
+	updateCanvasSizeIfNeeded(video_capture, video.videoWidth, video.videoHeight);
 
 	if (video.ntcType === 'device') {
 		video_capture_ctx.filter = 'brightness(1.75) contrast(1.75)';
@@ -582,7 +582,7 @@ video.addEventListener('click', async evt => {
 		0,
 		0,
 		video.videoWidth,
-		video.videoWidth
+		video.videoHeight
 	);
 
 	// Get field coordinates via flood-fill (includes borders on all sides)
@@ -622,7 +622,7 @@ video.addEventListener('click', async evt => {
 		ox = 0;
 		oy = 0;
 		ow = video.videoWidth;
-		oh = video.videoWidth;
+		oh = video.videoHeight;
 	} else {
 		console.log('Found offsets!');
 	}
@@ -1296,7 +1296,6 @@ async function updateFrameRate() {
 
 function stopCapture() {
 	timer.clearInterval(capture_process);
-	ref_image_bitmap = null;
 }
 
 async function startCapture(stream) {
@@ -1412,8 +1411,6 @@ function stopUnfocusedAlarm() {
 
 let capture_running = false;
 let dropped_frames_count = 0;
-
-let ref_image_bitmap;
 
 async function captureFrame() {
 	++frame_count;
