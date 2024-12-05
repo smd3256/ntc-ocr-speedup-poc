@@ -92,6 +92,8 @@ const send_binary = QueryString.get('binary') !== '0';
 
 const direct_tex2img = QueryString.get('direct') !== '0';
 
+const use_rvfc = QueryString.get('rvfc') !== '0';
+
 const default_frame_rate = 60;
 
 const is_match_room = /^\/room\/u\//.test(new URL(location).pathname);
@@ -1360,7 +1362,7 @@ async function startCapture(stream) {
 	console.log(
 		`Setting capture interval for ${settings.frameRate}fps (i.e. ${frame_ms}ms per frame)`
 	);
-	if (video.requestVideoFrameCallback) {
+	if (video.requestVideoFrameCallback && use_rvfc) {
 		capture_process = {
 			type: 'rvfc',
 			handle: video.requestVideoFrameCallback(captureFrame),
