@@ -1297,7 +1297,17 @@ async function updateFrameRate() {
 }
 
 function stopCapture() {
-	timer.clearInterval(capture_process);
+	if (capture_process) {
+		switch (capture_process.type) {
+			case 'timer':
+				timer.clearInterval(capture_process.handle);
+				break;
+			case 'rvfc':
+				video.cancelVideoFrameCallback(capture_process.handle);
+				break;
+		}
+	}
+	capture_process = null;
 }
 
 async function startCapture(stream) {
@@ -1350,7 +1360,17 @@ async function startCapture(stream) {
 	console.log(
 		`Setting capture interval for ${settings.frameRate}fps (i.e. ${frame_ms}ms per frame)`
 	);
-	capture_process = timer.setInterval(captureFrame, frame_ms);
+	if (video.requestVideoFrameCallback) {
+		capture_process = {
+			type: 'rvfc',
+			handle: video.requestVideoFrameCallback(captureFrame),
+		};
+	} else {
+		capture_process = {
+			type: 'timer',
+			handle: timer.setInterval(captureFrame, frame_ms),
+		};
+	}
 }
 
 let last_frame_time = 0;
@@ -1415,6 +1435,9 @@ let capture_running = false;
 let dropped_frames_count = 0;
 
 async function captureFrame() {
+	if (capture_process && capture_process.type === 'rvfc') {
+		capture_process.handle = video.requestVideoFrameCallback(captureFrame);
+	}
 	++frame_count;
 
 	const now = Date.now();
