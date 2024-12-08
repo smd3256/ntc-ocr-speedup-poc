@@ -2354,7 +2354,7 @@ let timer = stdTimer;
 
 	// check if timer should be made visible
 	if (QueryString.get('timer') === '1') {
-		timer_control.classList.remove('is_hidden');
+		timer_control.classList.remove('is-hidden');
 	}
 
 	// load external assets - could parrallelize
